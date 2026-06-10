@@ -2,10 +2,10 @@
 import { useState, useEffect } from 'react';
 import {
   collection, getDocs, updateDoc, addDoc,
-  doc, serverTimestamp, query, orderBy
+  doc, serverTimestamp, query, orderBy, where
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { C, S, fmt, fmtTgl, generateKode } from '@/components/theme';
@@ -42,42 +42,69 @@ export default function ManajerStokPage() {
     const unsub = onAuthStateChanged(auth, async u => {
       if (!u) { router.push('/admin-login'); return; }
 
-      // Cek role
-      const isAdmin = u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-      if (isAdmin) {
-        setUser(u);
-        loadData();
+  // Cek apakah admin
+    const isAdminUser = u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    if (isAdminUser) {
+      setUser(u);
+      loadData();
+      return;
+    }
+
+    // Cek role karyawan — pakai where agar efisien dan tidak gagal rules
+    try {
+      const q = query(
+        collection(db, 'karyawan'),
+        where('email', '==', u.email.toLowerCase())
+      );
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        router.push('/kasir');
         return;
       }
 
-      // Cek role karyawan di Firestore
-      const snap = await getDocs(query(collection(db, 'karyawan')));
-      const data = snap.docs.map(d => d.data()).find(d => d.email === u.email.toLowerCase());
+      const data = snap.docs[0].data();
 
-      if (!data || data.role !== 'manajer_stok') {
+      if (data.aktif === false) {
+        await auth.signOut();
+        router.push('/admin-login');
+        return;
+      }
+
+      if (data.role !== 'manajer_stok') {
         router.push('/kasir');
         return;
       }
 
       setUser(u);
       loadData();
+
+    } catch (err) {
+      console.error('Gagal cek role:', err.message);
+      router.push('/admin-login');
+    }
     });
     return unsub;
   }, []);
 
   const loadData = async () => {
     setLoading(true);
-    const [pSnap, kSnap, bSnap, rSnap] = await Promise.all([
-      getDocs(query(collection(db, 'produk'), orderBy('nama'))),
-      getDocs(collection(db, 'kategori')),
-      getDocs(query(collection(db, 'pembelian_stok'), orderBy('tanggal', 'desc'))),
-      getDocs(query(collection(db, 'penyesuaian_stok'), orderBy('tanggal', 'desc'))),
-    ]);
-    setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setKategori(kSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setPembelian(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setRiwayat(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setLoading(false);
+    try {
+      const [pSnap, kSnap, bSnap, rSnap] = await Promise.all([
+        getDocs(query(collection(db, 'produk'), orderBy('nama'))),
+        getDocs(collection(db, 'kategori')),
+        getDocs(query(collection(db, 'pembelian_stok'), orderBy('tanggal', 'desc'))),
+        getDocs(query(collection(db, 'penyesuaian_stok'), orderBy('tanggal', 'desc'))),
+      ]);
+      setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setKategori(kSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setPembelian(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setRiwayat(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error('loadData error:', err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Penyesuaian stok (stock opname)
