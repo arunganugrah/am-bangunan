@@ -6,7 +6,8 @@ import {
   collection, getDocs, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp, query, orderBy
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { initializeApp, getApps } from 'firebase/app';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -14,7 +15,10 @@ import Navbar from '@/components/Navbar';
 import { C, S, fmt, fmtTgl, generateKode, BULAN } from '@/components/theme';
 
 const ADMIN_EMAIL = 'admin@ambangunan.com'; // ← samakan dengan admin-login/page.js
-
+// App kedua khusus untuk daftar karyawan, agar session admin tidak terganggu
+const secondaryApp = getApps().find(a => a.name === 'secondary') ||
+  initializeApp(auth.app.options, 'secondary');
+const secondaryAuth = getAuth(secondaryApp);
 const TABS = ['Produk & Stok', 'Kategori', 'Pembelian Stok', 'Karyawan', 'Pengaturan'];
 
 export default function AdminPage() {
@@ -175,7 +179,8 @@ export default function AdminPage() {
     setKaryLoading(true);
     try {
       // Daftarkan ke Firebase Auth
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+await secondaryAuth.signOut(); // langsung logout dari secondary
       // Simpan data ke Firestore
       await addDoc(collection(db, 'karyawan'), {
         nama,
