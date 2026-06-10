@@ -113,7 +113,7 @@ export default function KasirPage() {
   const labaTransaksi = totalBayar - totalHPP;
   const kembalian     = bayar ? parseInt(bayar) - totalBayar : null;
 
-  const simpanTransaksi = async () => {
+const simpanTransaksi = async () => {
     if (keranjang.length === 0) return;
     if (kembalian !== null && kembalian < 0) return alert('Uang bayar kurang!');
     setLoading(true);
@@ -127,7 +127,7 @@ export default function KasirPage() {
         harga_jual: i.harga_jual_override || i.harga_jual,
         qty: i.qty,
         subtotal: i.subtotal,
-        laba: (i.harga_jual_override || i.harga_jual - i.harga_beli) * i.qty,
+        laba: ((i.harga_jual_override || i.harga_jual) - i.harga_beli) * i.qty,
       }));
 
       const data = {
@@ -148,14 +148,26 @@ export default function KasirPage() {
 
       const ref = await addDoc(collection(db, 'transaksi'), data);
 
-        // Kurangi stok langsung pakai doc ID
-        await updateDoc(doc(db, 'produk', item.produk_id), { stok: increment(-item.qty) });
+      // Kurangi stok semua item di keranjang
+      for (const item of keranjang) {
+        await updateDoc(doc(db, 'produk', item.produk_id), {
+          stok: increment(-item.qty)
+        });
+      }
 
-      const receiptData = { ...data, id: ref.id, tanggal: { seconds: Date.now()/1000 } };
+      const receiptData = {
+        ...data,
+        id: ref.id,
+        tanggal: { seconds: Date.now() / 1000 }
+      };
       setShowReceipt(receiptData);
       setKeranjang([]);
-      setNamaPembeli(''); setCatatan(''); setDiskon(''); setBayar('');
+      setNamaPembeli('');
+      setCatatan('');
+      setDiskon('');
+      setBayar('');
       loadProduk();
+
     } catch (err) {
       alert('Gagal simpan transaksi: ' + err.message);
     }
