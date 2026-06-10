@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { C, S, fmt, fmtTgl } from '@/components/theme';
 
-const ADMIN_EMAIL = 'admin@ambangunan.com'; // ← samakan
+const ADMIN_EMAIL = 'admin@ambangunan.com';
 
 export default function KasirPage() {
   const router      = useRouter();
@@ -31,6 +31,18 @@ export default function KasirPage() {
   const [sukses, setSukses]    = useState('');
   const [showReceipt, setShowReceipt] = useState(null);
   const searchRef = useRef(null);
+
+  // ✅ State mobile
+  const [mobileTab, setMobileTab] = useState('produk');
+  const [isMobile, setIsMobile]   = useState(false);
+
+  // ✅ Deteksi ukuran layar — reaktif saat resize
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async u => {
@@ -60,7 +72,7 @@ export default function KasirPage() {
     return matchKat && matchQ;
   });
 
-  // Tambah ke keranjang
+  // ✅ tambahItem: auto-switch ke tab keranjang di mobile
   const tambahItem = (p, qty = 1) => {
     setKeranjang(prev => {
       const idx = prev.findIndex(i => i.produk_id === p.id);
@@ -80,12 +92,14 @@ export default function KasirPage() {
         satuan: p.satuan,
         harga_beli: p.harga_beli,
         harga_jual: p.harga_jual,
-        harga_jual_override: null, // null = pakai standar
+        harga_jual_override: null,
         qty,
         stok: p.stok,
         subtotal: qty * p.harga_jual,
       }];
     });
+    // ✅ Auto-pindah ke tab keranjang saat item ditambah di mobile
+    if (isMobile) setMobileTab('keranjang');
   };
 
   const updateQty = (produk_id, qty) => {
@@ -113,7 +127,7 @@ export default function KasirPage() {
   const labaTransaksi = totalBayar - totalHPP;
   const kembalian     = bayar ? parseInt(bayar) - totalBayar : null;
 
-const simpanTransaksi = async () => {
+  const simpanTransaksi = async () => {
     if (keranjang.length === 0) return;
     if (kembalian !== null && kembalian < 0) return alert('Uang bayar kurang!');
     setLoading(true);
@@ -148,7 +162,6 @@ const simpanTransaksi = async () => {
 
       const ref = await addDoc(collection(db, 'transaksi'), data);
 
-      // Kurangi stok semua item di keranjang
       for (const item of keranjang) {
         await updateDoc(doc(db, 'produk', item.produk_id), {
           stok: increment(-item.qty)
@@ -166,6 +179,8 @@ const simpanTransaksi = async () => {
       setCatatan('');
       setDiskon('');
       setBayar('');
+      // ✅ Balik ke tab produk setelah transaksi selesai
+      if (isMobile) setMobileTab('produk');
       loadProduk();
 
     } catch (err) {
@@ -186,6 +201,9 @@ const simpanTransaksi = async () => {
     whiteSpace: 'nowrap',
   });
 
+  // ✅ Tinggi konten: desktop 60px navbar, mobile 60px navbar + 48px tab bar
+  const contentHeight = isMobile ? 'calc(100vh - 108px)' : 'calc(100vh - 60px)';
+
   return (
     <div style={{ minHeight:'100vh', background:C.bgPage, color:C.text }}>
       <Navbar title="Kasir" role={isAdmin ? 'admin' : 'kasir'} links={[
@@ -193,11 +211,49 @@ const simpanTransaksi = async () => {
         ...(isAdmin ? [{ href:'/admin', label:'Admin' }, { href:'/laporan', label:'Laporan' }] : []),
       ]} />
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 380px', height:'calc(100vh - 60px)' }}>
+      {/* ✅ Tab bar MOBILE — di LUAR grid, tepat di bawah Navbar */}
+      {isMobile && (
+        <div style={{
+          display: 'flex',
+          borderBottom: '2px solid #2d4a6e',
+          background: '#1a2535',
+          height: 48,
+        }}>
+          {['produk', 'keranjang'].map(tab => (
+            <button key={tab} onClick={() => setMobileTab(tab)} style={{
+              flex: 1,
+              padding: '10px',
+              border: 'none',
+              background: mobileTab === tab ? '#0f1c2b' : 'transparent',
+              color: mobileTab === tab ? '#f6c90e' : '#7a8fa6',
+              fontWeight: mobileTab === tab ? 700 : 400,
+              fontSize: 14,
+              cursor: 'pointer',
+              borderBottom: mobileTab === tab ? '3px solid #f6c90e' : '3px solid transparent',
+            }}>
+              {tab === 'keranjang'
+                ? `🛒 Keranjang${keranjang.length > 0 ? ` (${keranjang.length})` : ''}`
+                : '📦 Produk'}
+            </button>
+          ))}
+        </div>
+      )}
 
-        {/* KIRI: Produk */}
-        <div style={{ padding:20, overflowY:'auto', background:C.bgPage }}>
-          {/* Search & Filter */}
+      {/* ✅ Grid utama — responsive columns & height */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 380px',
+        height: contentHeight,
+      }}>
+
+        {/* KIRI: Produk — disembunyikan di mobile saat tab keranjang aktif */}
+        <div style={{
+          padding: 20,
+          overflowY: 'auto',
+          background: C.bgPage,
+          display: isMobile && mobileTab === 'keranjang' ? 'none' : 'block',
+        }}>
+          {/* Search */}
           <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
             <input
               ref={searchRef}
@@ -220,7 +276,7 @@ const simpanTransaksi = async () => {
           </div>
 
           {/* Grid Produk */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12 }}>
             {produkFiltered.map(p => {
               const habis = p.stok <= 0;
               const inCart = keranjang.find(i => i.produk_id === p.id);
@@ -229,7 +285,7 @@ const simpanTransaksi = async () => {
                   onClick={() => !habis && tambahItem(p)}
                   style={{
                     background: habis ? '#f7fafc' : C.bgCard,
-                    border: `2px solid ${inCart ? C.gold : habis ? C.border : C.border}`,
+                    border: `2px solid ${inCart ? C.gold : C.border}`,
                     borderRadius: 12,
                     padding: 14,
                     cursor: habis ? 'not-allowed' : 'pointer',
@@ -271,14 +327,14 @@ const simpanTransaksi = async () => {
           )}
         </div>
 
-        {/* KANAN: Keranjang */}
+        {/* KANAN: Keranjang — disembunyikan di mobile saat tab produk aktif */}
         <div style={{
-          background:'#1a2535',
-          color:'#e8edf2',
-          display:'flex',
-          flexDirection:'column',
-          borderLeft:`1px solid #2d4a6e`,
-          overflow:'hidden',
+          background: '#1a2535',
+          color: '#e8edf2',
+          display: isMobile && mobileTab === 'produk' ? 'none' : 'flex',
+          flexDirection: 'column',
+          borderLeft: isMobile ? 'none' : `1px solid #2d4a6e`,
+          overflow: 'hidden',
         }}>
           {/* Header keranjang */}
           <div style={{ padding:'16px 20px', borderBottom:'1px solid #2d4a6e', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -297,7 +353,27 @@ const simpanTransaksi = async () => {
             {keranjang.length === 0 ? (
               <div style={{ textAlign:'center', padding:'60px 20px', color:'#3d4f60' }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>🛒</div>
-                <div style={{ fontSize:14 }}>Klik produk untuk menambah</div>
+                <div style={{ fontSize:14 }}>
+                  {isMobile
+                    ? 'Kembali ke tab Produk untuk menambah item'
+                    : 'Klik produk untuk menambah'}
+                </div>
+                {/* ✅ Tombol shortcut balik ke produk di mobile */}
+                {isMobile && (
+                  <button onClick={() => setMobileTab('produk')} style={{
+                    marginTop: 16,
+                    padding: '10px 24px',
+                    borderRadius: 20,
+                    border: '1px solid #2d4a6e',
+                    background: '#0f1c2b',
+                    color: '#f6c90e',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}>
+                    📦 Pilih Produk
+                  </button>
+                )}
               </div>
             ) : keranjang.map(item => (
               <div key={item.produk_id} style={{
@@ -315,7 +391,6 @@ const simpanTransaksi = async () => {
                   </button>
                 </div>
 
-                {/* Override harga — hanya admin */}
                 {isAdmin && (
                   <div style={{ marginBottom:8 }}>
                     <input
@@ -330,7 +405,6 @@ const simpanTransaksi = async () => {
                 )}
 
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  {/* Qty control */}
                   <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                     <button onClick={() => updateQty(item.produk_id, item.qty - 1)}
                       style={{ width:28, height:28, borderRadius:6, border:'1px solid #2d4a6e', background:'#1a2535',
@@ -373,7 +447,6 @@ const simpanTransaksi = async () => {
                 </div>
               </div>
 
-              {/* Subtotal, diskon, total */}
               <div style={{ background:'#0f1c2b', borderRadius:10, padding:'12px 14px', marginBottom:12, fontSize:13 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', color:'#7a8fa6', marginBottom:4 }}>
                   <span>Subtotal</span><span>{fmt(subtotalBruto)}</span>
@@ -394,7 +467,6 @@ const simpanTransaksi = async () => {
                 )}
               </div>
 
-              {/* Bayar & kembalian */}
               <div style={{ marginBottom:12 }}>
                 <label style={{ fontSize:11, color:'#7a8fa6', display:'block', marginBottom:4 }}>UANG BAYAR (opsional)</label>
                 <input type="number" style={{ width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid #2d4a6e',
@@ -418,17 +490,21 @@ const simpanTransaksi = async () => {
             </div>
           )}
         </div>
-      </div>
+
+      </div>{/* end grid utama */}
 
       {/* Struk / Receipt Modal */}
       {showReceipt && (
         <div style={{
           position:'fixed', inset:0, background:'rgba(0,0,0,0.7)',
           display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000,
+          padding: isMobile ? '16px' : 0,
         }}>
           <div style={{
-            background:'#fff', borderRadius:16, padding:28, width:360,
-            maxHeight:'80vh', overflowY:'auto',
+            background:'#fff', borderRadius:16, padding:28,
+            width: isMobile ? '100%' : 360,
+            maxWidth: 400,
+            maxHeight:'85vh', overflowY:'auto',
             fontFamily:'monospace',
           }}>
             <div style={{ textAlign:'center', marginBottom:16 }}>

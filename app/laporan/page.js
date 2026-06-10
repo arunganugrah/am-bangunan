@@ -2,7 +2,7 @@
 // app/laporan/page.js — Laporan Keuangan Analitik (ADMIN ONLY)
 // Menghitung Omzet, HPP, Laba Kotor, analitik mendalam
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc, updateDoc, increment } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -36,7 +36,25 @@ export default function LaporanPage() {
     });
     return unsub;
   }, []);
-
+  const hapusTransaksi = async (id, items) => {
+    if (!confirm('Hapus transaksi ini? Stok akan dikembalikan otomatis.')) return;
+    try {
+      // Kembalikan stok produk
+      if (items && items.length > 0) {
+        for (const item of items) {
+          await updateDoc(doc(db, 'produk', item.produk_id), {
+            stok: increment(item.qty)
+          });
+        }
+      }
+      // Hapus dokumen transaksi
+      await deleteDoc(doc(db, 'transaksi', id));
+      alert('Transaksi berhasil dihapus dan stok sudah dikembalikan.');
+      loadData();
+    } catch (err) {
+      alert('Gagal hapus: ' + err.message);
+    }
+  };
   const loadData = async () => {
     setLoading(true);
     const [tSnap, bSnap, pSnap] = await Promise.all([
@@ -354,6 +372,7 @@ export default function LaporanPage() {
                 <th style={S.th}>Total</th>
                 <th style={S.th}>HPP</th>
                 <th style={S.th}>Laba</th>
+                <th style={S.th}>Aksi</th>
               </tr></thead>
               <tbody>
                 {txPeriode.map(t => (
@@ -371,6 +390,13 @@ export default function LaporanPage() {
                     <td style={{ ...S.td, fontWeight:700, color:C.gold }}>{fmt(t.total)}</td>
                     <td style={{ ...S.td, color:C.muted }}>{fmt(t.hpp||0)}</td>
                     <td style={{ ...S.td, fontWeight:600, color:(t.laba||0)>=0?C.green:C.red }}>{fmt(t.laba||0)}</td>
+                    <td style={S.td}>
+                      <button
+                        onClick={() => hapusTransaksi(t.id, t.items)}
+                        style={S.btnDanger}>
+                        Hapus
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {txPeriode.length === 0 && (
