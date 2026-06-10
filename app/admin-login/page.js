@@ -42,7 +42,11 @@ export default function LoginPage() {
       }
 
       if (data.role === 'admin') router.push('/admin');
-      else router.push('/kasir');
+      if (data.role === 'manajer_stok') {
+      router.push('/manajer-stok');
+      } else {
+      router.push('/kasir');
+      }
 
     } catch (err) {
       const kode = err.code;

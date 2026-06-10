@@ -599,6 +599,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
                   <label style={S.label}>Role</label>
                   <select style={S.select} value={formKary.role} onChange={e => setFormKary({...formKary, role:e.target.value})}>
                     <option value="kasir">Kasir</option>
+                    <option value="manajer_stok">Manajer Stok</option>
                   </select>
                 </div>
               </div>
