@@ -36,19 +36,29 @@ export default function LaporanPage() {
     });
     return unsub;
   }, []);
-  const hapusTransaksi = async (id, items) => {
+const hapusTransaksi = async (id, items) => {
     if (!confirm('Hapus transaksi ini? Stok akan dikembalikan otomatis.')) return;
     try {
-      // Kembalikan stok produk
       if (items && items.length > 0) {
         for (const item of items) {
-          await updateDoc(doc(db, 'produk', item.produk_id), {
-            stok: increment(item.qty)
-          });
+          if (!item.isBebas) {
+            await updateDoc(doc(db, 'produk', item.produk_id), {
+              stok: increment(item.qty)
+            });
+          }
+        }
+      }
+      await deleteDoc(doc(db, 'transaksi', id));
+      alert('Transaksi berhasil dihapus dan stok sudah dikembalikan.');
+      loadData();
+    } catch (err) {
+      alert('Gagal hapus: ' + err.message);
+    }
+  };
+
   const hapusPembelian = async (id, produk_id, jumlah) => {
     if (!confirm('Hapus riwayat pembelian stok ini?\nStok produk akan dikurangi kembali.')) return;
     try {
-      // Cari produk, kurangi stok
       const pSnap = await getDocs(collection(db, 'produk'));
       const pDoc  = pSnap.docs.find(d => d.id === produk_id);
       if (pDoc) {
@@ -58,16 +68,6 @@ export default function LaporanPage() {
       }
       await deleteDoc(doc(db, 'pembelian_stok', id));
       alert('Pembelian dihapus dan stok disesuaikan.');
-      loadData();
-    } catch (err) {
-      alert('Gagal hapus: ' + err.message);
-    }
-  };
-        }
-      }
-      // Hapus dokumen transaksi
-      await deleteDoc(doc(db, 'transaksi', id));
-      alert('Transaksi berhasil dihapus dan stok sudah dikembalikan.');
       loadData();
     } catch (err) {
       alert('Gagal hapus: ' + err.message);
@@ -423,7 +423,7 @@ export default function LaporanPage() {
                   </tr>
                 ))}
                 {txPeriode.length === 0 && (
-                  <tr><td colSpan={9} style={{ ...S.td, textAlign:'center', color:C.muted, padding:40 }}>
+                  <tr><td colSpan={10} style={{ ...S.td, textAlign:'center', color:C.muted, padding:40 }}>
                     Tidak ada transaksi di periode ini.
                   </td></tr>
                 )}
@@ -432,6 +432,53 @@ export default function LaporanPage() {
           </div>
         )}
 
+        {/* ── RIWAYAT PEMBELIAN STOK ── */}
+        {activeView === 'pembelian' && (
+          <div style={{ ...S.card, overflowX:'auto' }}>
+            <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>
+              Riwayat Pembelian Stok — {BULAN[bulan]} {tahun} ({bliPeriode.length} pembelian)
+            </div>
+            <div style={{ marginBottom:12, padding:'12px 16px', background:'#fff7ed', borderRadius:10,
+              border:`1px solid ${C.orange}40`, fontSize:13, color:C.orange }}>
+              ⚠️ Menghapus riwayat pembelian akan <strong>mengurangi stok produk</strong> kembali secara otomatis.
+            </div>
+            <table style={S.table}>
+              <thead><tr>
+                <th style={S.th}>Tanggal</th>
+                <th style={S.th}>Produk</th>
+                <th style={S.th}>Pemasok</th>
+                <th style={S.th}>Jumlah</th>
+                <th style={S.th}>Harga Beli</th>
+                <th style={S.th}>Total Bayar</th>
+                <th style={S.th}>Dicatat Oleh</th>
+                <th style={S.th}>Aksi</th>
+              </tr></thead>
+              <tbody>
+                {bliPeriode.map(b => (
+                  <tr key={b.id}>
+                    <td style={{ ...S.td, fontSize:12, color:C.muted, whiteSpace:'nowrap' }}>{fmtTgl(b.tanggal)}</td>
+                    <td style={{ ...S.td, fontWeight:600 }}>{b.nama_produk}</td>
+                    <td style={S.td}>{b.pemasok || '—'}</td>
+                    <td style={S.td}>{b.jumlah} {b.satuan}</td>
+                    <td style={{ ...S.td, color:C.muted }}>{fmt(b.harga_beli)}</td>
+                    <td style={{ ...S.td, fontWeight:700, color:C.orange }}>{fmt(b.total_bayar)}</td>
+                    <td style={{ ...S.td, fontSize:11, color:C.muted }}>{b.dicatat_oleh?.split('@')[0] || '—'}</td>
+                    <td style={S.td}>
+                      <button onClick={() => hapusPembelian(b.id, b.produk_id, b.jumlah)} style={S.btnDanger}>
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {bliPeriode.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...S.td, textAlign:'center', color:C.muted, padding:40 }}>
+                    Tidak ada pembelian di periode ini.
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
         {/* ── ANALITIK PRODUK ── */}
         {activeView === 'produk' && (
           <>
@@ -457,55 +504,6 @@ export default function LaporanPage() {
                     </div>
                   );
                 })}
-                {/* ── RIWAYAT PEMBELIAN STOK ── */}
-                  {activeView === 'pembelian' && (
-                    <div style={S.card}>
-                      <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>
-                        Riwayat Pembelian Stok — {BULAN[bulan]} {tahun} ({bliPeriode.length} pembelian)
-                      </div>
-                      <div style={{ marginBottom:12, padding:'12px 16px', background:'#fff7ed', borderRadius:10,
-                        border:`1px solid ${C.orange}40`, fontSize:13, color:C.orange }}>
-                        ⚠️ Menghapus riwayat pembelian akan <strong>mengurangi stok produk</strong> kembali secara otomatis.
-                      </div>
-                      <table style={S.table}>
-                        <thead><tr>
-                          <th style={S.th}>Tanggal</th>
-                          <th style={S.th}>Produk</th>
-                          <th style={S.th}>Pemasok</th>
-                          <th style={S.th}>Jumlah</th>
-                          <th style={S.th}>Harga Beli</th>
-                          <th style={S.th}>Total Bayar</th>
-                          <th style={S.th}>Dicatat Oleh</th>
-                          <th style={S.th}>Aksi</th>
-                        </tr></thead>
-                        <tbody>
-                          {bliPeriode.map(b => (
-                            <tr key={b.id}>
-                              <td style={{ ...S.td, fontSize:12, color:C.muted, whiteSpace:'nowrap' }}>{fmtTgl(b.tanggal)}</td>
-                              <td style={{ ...S.td, fontWeight:600 }}>{b.nama_produk}</td>
-                              <td style={S.td}>{b.pemasok || '—'}</td>
-                              <td style={S.td}>{b.jumlah} {b.satuan}</td>
-                              <td style={{ ...S.td, color:C.muted }}>{fmt(b.harga_beli)}</td>
-                              <td style={{ ...S.td, fontWeight:700, color:C.orange }}>{fmt(b.total_bayar)}</td>
-                              <td style={{ ...S.td, fontSize:11, color:C.muted }}>{b.dicatat_oleh?.split('@')[0] || '—'}</td>
-                              <td style={S.td}>
-                                <button
-                                  onClick={() => hapusPembelian(b.id, b.produk_id, b.jumlah)}
-                                  style={S.btnDanger}>
-                                  Hapus
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                          {bliPeriode.length === 0 && (
-                            <tr><td colSpan={8} style={{ ...S.td, textAlign:'center', color:C.muted, padding:40 }}>
-                              Tidak ada pembelian di periode ini.
-                            </td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
               </div>
 
               <div style={S.card}>

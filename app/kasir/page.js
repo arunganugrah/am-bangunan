@@ -31,6 +31,7 @@ export default function KasirPage() {
   const [sukses, setSukses]    = useState('');
   const [showReceipt, setShowReceipt] = useState(null);
   const searchRef = useRef(null);
+  const [itemBebas, setItemBebas] = useState({ nama:'', harga:'', qty:'1' });
 
   // ✅ State mobile
   const [mobileTab, setMobileTab] = useState('produk');
@@ -73,6 +74,30 @@ export default function KasirPage() {
   });
 
   // ✅ tambahItem: auto-switch ke tab keranjang di mobile
+  const tambahItemBebas = () => {
+    const { nama, harga, qty } = itemBebas;
+    if (!nama) return alert('Nama item wajib!');
+    if (!harga) return alert('Harga wajib!');
+    const q = parseFloat(qty) || 1;
+    const h = parseInt(harga);
+    const fakeId = 'BEBAS-' + Date.now();
+    setKeranjang(prev => [...prev, {
+      produk_id: fakeId,
+      kode: 'ITEM',
+      nama: nama.trim(),
+      satuan: 'pcs',
+      harga_beli: 0,
+      harga_jual: h,
+      harga_jual_override: null,
+      qty: q,
+      stok: 999,
+      subtotal: q * h,
+      isBebas: true,
+    }]);
+    setItemBebas({ nama:'', harga:'', qty:'1' });
+    if (isMobile) setMobileTab('keranjang');
+  };
+
   const tambahItem = (p, qty = 1) => {
     setKeranjang(prev => {
       const idx = prev.findIndex(i => i.produk_id === p.id);
@@ -163,6 +188,7 @@ export default function KasirPage() {
       const ref = await addDoc(collection(db, 'transaksi'), data);
 
       for (const item of keranjang) {
+        if (item.isBebas) continue;
         await updateDoc(doc(db, 'produk', item.produk_id), {
           stok: increment(-item.qty)
         });
@@ -273,6 +299,34 @@ export default function KasirPage() {
                 {k.nama}
               </button>
             ))}
+          </div>
+
+          {/* ── Item Bebas ── */}
+          <div style={{ background:'#fff8e7', border:`1px dashed ${C.gold}`, borderRadius:10,
+            padding:'10px 14px', marginBottom:14 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:C.gold, marginBottom:8 }}>
+              ➕ Item Bebas — tidak masuk stok, muncul di struk
+            </div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'flex-end' }}>
+              <div style={{ flex:2, minWidth:120 }}>
+                <label style={{ fontSize:10, color:C.muted, display:'block', marginBottom:3 }}>Nama Item</label>
+                <input style={{ ...S.input, fontSize:12 }} placeholder="mis. Ongkos kirim, Jasa pasang..."
+                  value={itemBebas.nama} onChange={e => setItemBebas({...itemBebas, nama:e.target.value})} />
+              </div>
+              <div style={{ flex:1, minWidth:80 }}>
+                <label style={{ fontSize:10, color:C.muted, display:'block', marginBottom:3 }}>Harga</label>
+                <input style={{ ...S.input, fontSize:12 }} type="number" placeholder="0"
+                  value={itemBebas.harga} onChange={e => setItemBebas({...itemBebas, harga:e.target.value})} />
+              </div>
+              <div style={{ width:56 }}>
+                <label style={{ fontSize:10, color:C.muted, display:'block', marginBottom:3 }}>Qty</label>
+                <input style={{ ...S.input, fontSize:12 }} type="number" placeholder="1"
+                  value={itemBebas.qty} onChange={e => setItemBebas({...itemBebas, qty:e.target.value})} />
+              </div>
+              <button onClick={tambahItemBebas} style={{ ...S.btnGold, fontSize:12, padding:'9px 14px' }}>
+                + Tambah
+              </button>
+            </div>
           </div>
 
           {/* Grid Produk */}
@@ -500,7 +554,7 @@ export default function KasirPage() {
           display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000,
           padding: isMobile ? '16px' : 0,
         }}>
-          <div style={{
+          <div className="struk-print" style={{
             background:'#fff', borderRadius:16, padding:28,
             width: isMobile ? '100%' : 360,
             maxWidth: 400,
@@ -549,11 +603,16 @@ export default function KasirPage() {
             <div style={{ borderTop:'1px dashed #ccc', marginTop:12, paddingTop:12, textAlign:'center', fontSize:11, color:C.muted }}>
               Terima kasih atas kunjungan Anda!
             </div>
-            <button
-              onClick={() => { setShowReceipt(null); searchRef.current?.focus(); }}
-              style={{ ...S.btnGold, width:'100%', marginTop:14, padding:12, fontSize:14 }}>
-              Tutup & Transaksi Baru
-            </button>
+            <div style={{ display:'flex', gap:8, marginTop:14 }}>
+              <button onClick={() => window.print()}
+                style={{ ...S.btnGold, flex:1, padding:12, fontSize:14, background:'#1a7f4b', color:'#fff' }}>
+                🖨️ Cetak
+              </button>
+              <button onClick={() => { setShowReceipt(null); searchRef.current?.focus(); }}
+                style={{ ...S.btnGold, flex:1, padding:12, fontSize:14 }}>
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
