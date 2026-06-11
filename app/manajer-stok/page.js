@@ -117,16 +117,6 @@ export default function ManajerStokPage() {
       setLoading(false);
     }
   };
-      setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setKategori(kSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPembelian(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setRiwayat(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      console.error('loadData error:', err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Penyesuaian stok (stock opname)
   const simpanPenyesuaian = async () => {
