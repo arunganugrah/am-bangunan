@@ -152,6 +152,93 @@ export default function KasirPage() {
   const labaTransaksi = totalBayar - totalHPP;
   const kembalian     = bayar ? parseInt(bayar) - totalBayar : null;
 
+ const cetakStruk = (receipt) => {
+    const tanggal = new Date(receipt.tanggal.seconds * 1000).toLocaleString('id-ID');
+    const itemsHtml = receipt.items.map(item => `
+      <tr>
+        <td style="padding:4px 0">${item.nama}</td>
+        <td style="text-align:center;padding:4px 8px">${item.qty} ${item.satuan}</td>
+        <td style="text-align:right;padding:4px 0">Rp ${Math.round(item.harga_jual).toLocaleString('id-ID')}</td>
+        <td style="text-align:right;padding:4px 0;font-weight:bold">Rp ${Math.round(item.subtotal).toLocaleString('id-ID')}</td>
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Struk AM Bangunan</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: monospace; font-size: 12px; width: 300px; margin: 0 auto; padding: 16px; }
+    .toko { text-align:center; margin-bottom:12px; }
+    .toko h2 { font-size:16px; font-weight:900; letter-spacing:1px; }
+    .toko p { font-size:11px; color:#555; margin-top:2px; }
+    .garis { border-top:1px dashed #000; margin:8px 0; }
+    table { width:100%; border-collapse:collapse; }
+    th { font-size:10px; text-align:left; padding:4px 0; border-bottom:1px solid #ccc; }
+    .total-row { font-size:14px; font-weight:bold; }
+    .footer { text-align:center; font-size:11px; color:#555; margin-top:12px; }
+    @media print {
+      body { width:100%; }
+      button { display:none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toko">
+    <h2>AM BANGUNAN</h2>
+    <p>Struk Pembelian</p>
+    <p>${tanggal}</p>
+    ${receipt.namaPembeli && receipt.namaPembeli !== 'Umum' ? `<p>Pembeli: ${receipt.namaPembeli}</p>` : ''}
+  </div>
+  <div class="garis"></div>
+  <table>
+    <thead><tr>
+      <th>Item</th>
+      <th style="text-align:center">Qty</th>
+      <th style="text-align:right">Harga</th>
+      <th style="text-align:right">Subtotal</th>
+    </tr></thead>
+    <tbody>${itemsHtml}</tbody>
+  </table>
+  <div class="garis"></div>
+  ${receipt.diskon > 0 ? `
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+    <span>Diskon</span>
+    <span>- Rp ${Math.round(receipt.diskon).toLocaleString('id-ID')}</span>
+  </div>` : ''}
+  <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:bold;margin-bottom:4px">
+    <span>TOTAL</span>
+    <span>Rp ${Math.round(receipt.total).toLocaleString('id-ID')}</span>
+  </div>
+  ${receipt.kembalian > 0 ? `
+  <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+    <span>Bayar</span><span>Rp ${Math.round(receipt.bayar).toLocaleString('id-ID')}</span>
+  </div>
+  <div style="display:flex;justify-content:space-between">
+    <span>Kembalian</span><span>Rp ${Math.round(receipt.kembalian).toLocaleString('id-ID')}</span>
+  </div>` : ''}
+  <div class="garis"></div>
+  <div class="footer">Terima kasih atas kunjungan Anda!</div>
+  <br>
+  <div style="text-align:center">
+    <button onclick="window.print();window.close();"
+      style="padding:8px 24px;font-size:13px;cursor:pointer;background:#1a7f4b;color:#fff;border:none;border-radius:6px">
+      🖨️ Cetak Sekarang
+    </button>
+  </div>
+</body>
+</html>`;
+
+    const popup = window.open('', '_blank', 'width=380,height=600,scrollbars=yes');
+    if (!popup) {
+      alert('Popup diblokir browser. Izinkan popup untuk situs ini di pengaturan browser, lalu coba lagi.');
+      return;
+    }
+    popup.document.write(html);
+    popup.document.close();
+  }; 
   const simpanTransaksi = async () => {
     if (keranjang.length === 0) return;
     if (kembalian !== null && kembalian < 0) return alert('Uang bayar kurang!');
@@ -604,7 +691,7 @@ export default function KasirPage() {
               Terima kasih atas kunjungan Anda!
             </div>
             <div style={{ display:'flex', gap:8, marginTop:14 }}>
-              <button onClick={() => window.print()}
+              <button onClick={() => cetakStruk(showReceipt)}
                 style={{ ...S.btnGold, flex:1, padding:12, fontSize:14, background:'#1a7f4b', color:'#fff' }}>
                 🖨️ Cetak
               </button>
