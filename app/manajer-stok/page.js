@@ -90,15 +90,11 @@ export default function ManajerStokPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const loadData = async () => {
-    setLoading(true);
-    try {
       const pSnap = await getDocs(query(collection(db, 'produk'), orderBy('nama')));
       const kSnap = await getDocs(collection(db, 'kategori'));
       setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setKategori(kSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      // Query berisiko dipisah dengan try sendiri
       try {
         const bSnap = await getDocs(query(collection(db, 'pembelian_stok'), orderBy('tanggal', 'desc')));
         setPembelian(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
