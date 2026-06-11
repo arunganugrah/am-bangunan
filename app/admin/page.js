@@ -31,7 +31,15 @@ export default function AdminPage() {
   const [pembelian, setPembelian] = useState([]);
   const [filterKat, setFilterKat] = useState('');
   const [searchQ, setSearchQ]   = useState('');
-
+  // ── MOBILE RESPONSIVE ──
+const [isMobile, setIsMobile] = useState(false);
+const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+useEffect(() => {
+  const check = () => setIsMobile(window.innerWidth < 768);
+  check();
+  window.addEventListener('resize', check);
+  return () => window.removeEventListener('resize', check);
+}, []);
   // Form produk
   const emptyProduk = {
     kode:'', nama:'', kategori_id:'', satuan:'pcs',
@@ -139,6 +147,24 @@ export default function AdminPage() {
   };
 
   // ── PEMBELIAN STOK ──
+  const hapusPembelian = async (id, produk_id, jumlah, harga_beli_lama) => {
+  if (!confirm('Hapus riwayat pembelian ini?\nStok produk akan dikurangi otomatis.')) return;
+  try {
+    // Kurangi stok yang pernah ditambahkan
+    const p = produk.find(x => x.id === produk_id);
+    if (p) {
+      await updateDoc(doc(db, 'produk', produk_id), {
+        stok: Math.max(0, (p.stok || 0) - jumlah),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    await deleteDoc(doc(db, 'pembelian_stok', id));
+    alert('Riwayat pembelian berhasil dihapus dan stok disesuaikan.');
+    loadAll();
+  } catch (err) {
+    alert('Gagal hapus: ' + err.message);
+  }
+};
   const simpanPembelian = async () => {
     const { produk_id, jumlah, harga_beli } = formBeli;
     if (!produk_id) return alert('Pilih produk!');
@@ -240,7 +266,25 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
         { href:'/laporan', label:'Laporan' },
       ]} />
 
-      <div style={{ padding:'24px 28px' }}>
+      <div style={{ padding: isMobile ? '12px 14px' : '24px 28px' }}>
+        {/* Tabs — mobile: scroll horizontal dengan ukuran lebih kecil */}
+        <div style={{
+          display: 'flex',
+          borderBottom: `1px solid ${C.border}`,
+          marginBottom: isMobile ? 16 : 24,
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          gap: 0,
+        }}>
+          {TABS.map((t, i) => (
+            <button key={i} style={{
+              ...tabStyle(tab === i),
+              fontSize: isMobile ? 12 : 14,
+              padding: isMobile ? '10px 12px' : '12px 20px',
+              whiteSpace: 'nowrap',
+            }} onClick={() => setTab(i)}>{t}</button>
+          ))}
+        </div>
         {/* Tabs */}
         <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24, overflowX:'auto' }}>
           {TABS.map((t,i) => <button key={i} style={tabStyle(tab===i)} onClick={() => setTab(i)}>{t}</button>)}
@@ -254,7 +298,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
               <div style={{ fontSize:15, fontWeight:700, color:C.gold, marginBottom:16 }}>
                 {editingProduk ? 'Edit Produk' : '+ Tambah Produk Baru'}
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:12, marginBottom:12 }}>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '2fr 1fr 1fr 1fr', gap:12, marginBottom:12 }}>
                 <div>
                   <label style={S.label}>Nama Produk *</label>
                   <input style={S.input} placeholder="mis. Semen Tiga Roda 50kg"
@@ -287,7 +331,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
                   </select>
                 </div>
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 2fr', gap:12, marginBottom:16 }}>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr 1fr 2fr', gap:12, marginBottom:16 }}>
                 <div>
                   <label style={S.label}>Harga Beli (HPP) *</label>
                   <input style={S.input} type="number" placeholder="0"
@@ -343,7 +387,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
             </div>
 
             {/* Tabel Produk */}
-            <div style={S.card}>
+            <div style={{ ...S.card, overflowX: 'auto' }}>
               <table style={S.table}>
                 <thead><tr>
                   <th style={S.th}>Kode</th>
@@ -486,7 +530,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
               <div style={{ color:C.muted, fontSize:13, marginBottom:16 }}>
                 Setiap pembelian dicatat sebagai HPP dan stok otomatis bertambah.
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:12, marginBottom:12 }}>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '2fr 1fr 1fr', gap:12, marginBottom:12 }}>
                 <div>
                   <label style={S.label}>Produk</label>
                   <select style={S.select} value={formBeli.produk_id}
@@ -535,7 +579,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
               </button>
             </div>
 
-            <div style={S.card}>
+            <div style={{ ...S.card, overflowX: 'auto' }}>
               <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:14 }}>Riwayat Pembelian</div>
               <table style={S.table}>
                 <thead><tr>
@@ -545,6 +589,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
                   <th style={S.th}>Jumlah</th>
                   <th style={S.th}>Harga Beli</th>
                   <th style={S.th}>Total Bayar</th>
+                  <th style={S.th}>Aksi</th>
                 </tr></thead>
                 <tbody>
                   {pembelian.map(b => (
@@ -555,6 +600,13 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
                       <td style={S.td}>{b.jumlah} {b.satuan}</td>
                       <td style={{ ...S.td, color:C.muted }}>{fmt(b.harga_beli)}</td>
                       <td style={{ ...S.td, fontWeight:700, color:C.orange }}>{fmt(b.total_bayar)}</td>
+                      <td style={S.td}>
+                        <button
+                          style={S.btnDanger}
+                          onClick={() => hapusPembelian(b.id, b.produk_id, b.jumlah, b.harga_beli)}>
+                          Hapus
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {pembelian.length === 0 && (
@@ -606,7 +658,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
                 {karyLoading ? 'Mendaftarkan...' : '+ Tambah Karyawan'}
               </button>
             </div>
-            <div style={S.card}>
+            <div style={{ ...S.card, overflowX: 'auto' }}>
               <table style={S.table}>
                 <thead><tr>
                   <th style={S.th}>Nama</th>

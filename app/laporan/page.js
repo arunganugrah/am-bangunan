@@ -45,6 +45,24 @@ export default function LaporanPage() {
           await updateDoc(doc(db, 'produk', item.produk_id), {
             stok: increment(item.qty)
           });
+  const hapusPembelian = async (id, produk_id, jumlah) => {
+    if (!confirm('Hapus riwayat pembelian stok ini?\nStok produk akan dikurangi kembali.')) return;
+    try {
+      // Cari produk, kurangi stok
+      const pSnap = await getDocs(collection(db, 'produk'));
+      const pDoc  = pSnap.docs.find(d => d.id === produk_id);
+      if (pDoc) {
+        await updateDoc(doc(db, 'produk', produk_id), {
+          stok: Math.max(0, (pDoc.data().stok || 0) - jumlah),
+        });
+      }
+      await deleteDoc(doc(db, 'pembelian_stok', id));
+      alert('Pembelian dihapus dan stok disesuaikan.');
+      loadData();
+    } catch (err) {
+      alert('Gagal hapus: ' + err.message);
+    }
+  };
         }
       }
       // Hapus dokumen transaksi
@@ -187,7 +205,12 @@ export default function LaporanPage() {
 
         {/* View tabs */}
         <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
-          {[['ringkasan','Ringkasan Eksekutif'],['transaksi','Riwayat Transaksi'],['produk','Analitik Produk']].map(([v,l]) => (
+          {[
+          ['ringkasan','Ringkasan Eksekutif'],
+          ['transaksi','Riwayat Transaksi'],
+          ['pembelian','Riwayat Pembelian Stok'],
+          ['produk','Analitik Produk'],
+        ].map(([v,l]) => (
             <button key={v} style={tabStyle(activeView===v)} onClick={() => setActiveView(v)}>{l}</button>
           ))}
         </div>
@@ -434,6 +457,55 @@ export default function LaporanPage() {
                     </div>
                   );
                 })}
+                {/* ── RIWAYAT PEMBELIAN STOK ── */}
+                  {activeView === 'pembelian' && (
+                    <div style={S.card}>
+                      <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>
+                        Riwayat Pembelian Stok — {BULAN[bulan]} {tahun} ({bliPeriode.length} pembelian)
+                      </div>
+                      <div style={{ marginBottom:12, padding:'12px 16px', background:'#fff7ed', borderRadius:10,
+                        border:`1px solid ${C.orange}40`, fontSize:13, color:C.orange }}>
+                        ⚠️ Menghapus riwayat pembelian akan <strong>mengurangi stok produk</strong> kembali secara otomatis.
+                      </div>
+                      <table style={S.table}>
+                        <thead><tr>
+                          <th style={S.th}>Tanggal</th>
+                          <th style={S.th}>Produk</th>
+                          <th style={S.th}>Pemasok</th>
+                          <th style={S.th}>Jumlah</th>
+                          <th style={S.th}>Harga Beli</th>
+                          <th style={S.th}>Total Bayar</th>
+                          <th style={S.th}>Dicatat Oleh</th>
+                          <th style={S.th}>Aksi</th>
+                        </tr></thead>
+                        <tbody>
+                          {bliPeriode.map(b => (
+                            <tr key={b.id}>
+                              <td style={{ ...S.td, fontSize:12, color:C.muted, whiteSpace:'nowrap' }}>{fmtTgl(b.tanggal)}</td>
+                              <td style={{ ...S.td, fontWeight:600 }}>{b.nama_produk}</td>
+                              <td style={S.td}>{b.pemasok || '—'}</td>
+                              <td style={S.td}>{b.jumlah} {b.satuan}</td>
+                              <td style={{ ...S.td, color:C.muted }}>{fmt(b.harga_beli)}</td>
+                              <td style={{ ...S.td, fontWeight:700, color:C.orange }}>{fmt(b.total_bayar)}</td>
+                              <td style={{ ...S.td, fontSize:11, color:C.muted }}>{b.dicatat_oleh?.split('@')[0] || '—'}</td>
+                              <td style={S.td}>
+                                <button
+                                  onClick={() => hapusPembelian(b.id, b.produk_id, b.jumlah)}
+                                  style={S.btnDanger}>
+                                  Hapus
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {bliPeriode.length === 0 && (
+                            <tr><td colSpan={8} style={{ ...S.td, textAlign:'center', color:C.muted, padding:40 }}>
+                              Tidak ada pembelian di periode ini.
+                            </td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
               </div>
 
               <div style={S.card}>
