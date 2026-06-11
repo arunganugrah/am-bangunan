@@ -90,12 +90,37 @@ export default function ManajerStokPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [pSnap, kSnap, bSnap, rSnap] = await Promise.all([
-        getDocs(query(collection(db, 'produk'), orderBy('nama'))),
-        getDocs(collection(db, 'kategori')),
-        getDocs(query(collection(db, 'pembelian_stok'), orderBy('tanggal', 'desc'))),
-        getDocs(query(collection(db, 'penyesuaian_stok'), orderBy('tanggal', 'desc'))),
-      ]);
+      const loadData = async () => {
+    setLoading(true);
+    try {
+      const pSnap = await getDocs(query(collection(db, 'produk'), orderBy('nama')));
+      const kSnap = await getDocs(collection(db, 'kategori'));
+      setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setKategori(kSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Query berisiko dipisah dengan try sendiri
+      try {
+        const bSnap = await getDocs(query(collection(db, 'pembelian_stok'), orderBy('tanggal', 'desc')));
+        setPembelian(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.warn('pembelian_stok:', e.message);
+        setPembelian([]);
+      }
+
+      try {
+        const rSnap = await getDocs(query(collection(db, 'penyesuaian_stok'), orderBy('tanggal', 'desc')));
+        setRiwayat(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.warn('penyesuaian_stok:', e.message);
+        setRiwayat([]);
+      }
+
+    } catch (err) {
+      console.error('loadData error:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
       setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setKategori(kSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPembelian(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -117,53 +142,60 @@ export default function ManajerStokPage() {
     const aktual = parseFloat(jumlah_aktual);
     const selisih = aktual - (p?.stok || 0);
 
-    // Simpan riwayat penyesuaian
-    await addDoc(collection(db, 'penyesuaian_stok'), {
-      tanggal: serverTimestamp(),
-      produk_id,
-      nama_produk: p?.nama || '',
-      stok_sistem: p?.stok || 0,
-      stok_aktual: aktual,
-      selisih,
-      catatan: catatan || '',
-      dicatat_oleh: user?.email || '',
-    });
+    try {
+      await addDoc(collection(db, 'penyesuaian_stok'), {
+        tanggal: serverTimestamp(),
+        produk_id,
+        nama_produk: p?.nama || '',
+        stok_sistem: p?.stok || 0,
+        stok_aktual: aktual,
+        selisih,
+        catatan: catatan || '',
+        dicatat_oleh: user?.email || '',
+      });
 
-    // Update stok di produk
-    await updateDoc(doc(db, 'produk', produk_id), {
-      stok: aktual,
-      updatedAt: serverTimestamp(),
-    });
+      await updateDoc(doc(db, 'produk', produk_id), {
+        stok: aktual,
+        updatedAt: serverTimestamp(),
+      });
 
-    setSukses(`Stok ${p?.nama} diperbarui: ${p?.stok} → ${aktual} (selisih: ${selisih > 0 ? '+' : ''}${selisih})`);
-    setFormSesuai({ produk_id: '', jumlah_aktual: '', catatan: '' });
-    setTimeout(() => setSukses(''), 5000);
-    loadData();
+      setSukses(`Stok ${p?.nama} diperbarui: ${p?.stok} → ${aktual} (selisih: ${selisih > 0 ? '+' : ''}${selisih})`);
+      setFormSesuai({ produk_id: '', jumlah_aktual: '', catatan: '' });
+      setTimeout(() => setSukses(''), 5000);
+      loadData();
+
+    } catch (err) {
+      alert('Gagal simpan penyesuaian: ' + err.message);
+    }
   };
 
   // Tambah produk baru (tanpa harga)
   const simpanProdukBaru = async () => {
     if (!formBaru.nama) return alert('Nama produk wajib!');
     const kat = kategori.find(k => k.id === formBaru.kategori_id);
-    await addDoc(collection(db, 'produk'), {
-      kode: formBaru.kode || generateKode(),
-      nama: formBaru.nama,
-      kategori_id: formBaru.kategori_id || '',
-      nama_kategori: kat?.nama || '',
-      satuan: formBaru.satuan || 'pcs',
-      harga_beli: 0,
-      harga_jual: 0,
-      stok: parseFloat(formBaru.stok) || 0,
-      stok_minimum: 5,
-      keterangan: formBaru.keterangan || '',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    setSukses('Produk berhasil ditambahkan. Admin perlu mengisi harga jual.');
-    setFormBaru(emptyForm);
-    setShowFormBaru(false);
-    setTimeout(() => setSukses(''), 5000);
-    loadData();
+    try {
+      await addDoc(collection(db, 'produk'), {
+        kode: formBaru.kode || generateKode(),
+        nama: formBaru.nama,
+        kategori_id: formBaru.kategori_id || '',
+        nama_kategori: kat?.nama || '',
+        satuan: formBaru.satuan || 'pcs',
+        harga_beli: 0,
+        harga_jual: 0,
+        stok: parseFloat(formBaru.stok) || 0,
+        stok_minimum: 5,
+        keterangan: formBaru.keterangan || '',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setSukses('Produk berhasil ditambahkan. Admin perlu mengisi harga jual.');
+      setFormBaru(emptyForm);
+      setShowFormBaru(false);
+      setTimeout(() => setSukses(''), 5000);
+      loadData();
+    } catch (err) {
+      alert('Gagal tambah produk: ' + err.message);
+    }
   };
 
   const produkFiltered = produk.filter(p => {

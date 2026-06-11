@@ -39,13 +39,18 @@ export default function StokPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const [pSnap, kSnap] = await Promise.all([
-      getDocs(query(collection(db, 'produk'), orderBy('nama'))),
-      getDocs(collection(db, 'kategori')),
-    ]);
-    setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setKategori(kSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setLoading(false);
+    try {
+      const [pSnap, kSnap] = await Promise.all([
+        getDocs(query(collection(db, 'produk'), orderBy('nama'))),
+        getDocs(collection(db, 'kategori')),
+      ]);
+      setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setKategori(kSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error('loadData stok error:', err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const simpanProdukBaru = async () => {

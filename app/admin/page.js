@@ -6,10 +6,9 @@ import {
   collection, getDocs, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp, query, orderBy
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged } from 'firebase/auth';
 import { initializeApp, getApps } from 'firebase/app';
 import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { C, S, fmt, fmtTgl, generateKode, BULAN } from '@/components/theme';
