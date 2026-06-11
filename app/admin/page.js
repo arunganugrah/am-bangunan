@@ -33,7 +33,6 @@ export default function AdminPage() {
   const [searchQ, setSearchQ]   = useState('');
   // ── MOBILE RESPONSIVE ──
 const [isMobile, setIsMobile] = useState(false);
-const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 useEffect(() => {
   const check = () => setIsMobile(window.innerWidth < 768);
   check();
@@ -284,10 +283,6 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
               whiteSpace: 'nowrap',
             }} onClick={() => setTab(i)}>{t}</button>
           ))}
-        </div>
-        {/* Tabs */}
-        <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24, overflowX:'auto' }}>
-          {TABS.map((t,i) => <button key={i} style={tabStyle(tab===i)} onClick={() => setTab(i)}>{t}</button>)}
         </div>
 
         {/* ══ TAB 0: PRODUK ══ */}
@@ -554,7 +549,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
                     value={formBeli.harga_beli} onChange={e => setFormBeli({...formBeli, harga_beli:e.target.value})} />
                 </div>
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:12, marginBottom:12 }}>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 2fr', gap:12, marginBottom:12 }}>
                 <div>
                   <label style={S.label}>Nama Pemasok</label>
                   <input style={S.input} placeholder="Nama pemasok/distributor"
@@ -610,7 +605,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
                     </tr>
                   ))}
                   {pembelian.length === 0 && (
-                    <tr><td colSpan={6} style={{ ...S.td, textAlign:'center', color:C.muted, padding:30 }}>
+                    <tr><td colSpan={7} style={{ ...S.td, textAlign:'center', color:C.muted, padding:30 }}>
                       Belum ada riwayat pembelian.
                     </td></tr>
                   )}
@@ -630,7 +625,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
               <div style={{ color:C.muted, fontSize:13, marginBottom:16 }}>
                 Karyawan hanya bisa akses Kasir dan input stok — tidak bisa lihat Laporan Keuangan atau ubah harga.
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12, marginBottom:14 }}>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap:12, marginBottom:14 }}>
                 <div>
                   <label style={S.label}>Nama Lengkap</label>
                   <input style={S.input} placeholder="Nama karyawan"
