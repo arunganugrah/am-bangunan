@@ -37,24 +37,26 @@ export default function LaporanPage() {
     return unsub;
   }, []);
 const hapusTransaksi = async (id, items) => {
-    if (!confirm('Hapus transaksi ini? Stok akan dikembalikan otomatis.')) return;
-    try {
-      if (items && items.length > 0) {
-        for (const item of items) {
-          if (!item.isBebas) {
-            await updateDoc(doc(db, 'produk', item.produk_id), {
-              stok: increment(item.qty)
-            });
-          }
+  if (!confirm('Hapus transaksi ini? Stok akan dikembalikan otomatis.')) return;
+  try {
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const isBebasItem = item.isBebas ||
+          (item.produk_id && item.produk_id.startsWith('BEBAS-'));
+        if (!isBebasItem) {
+          await updateDoc(doc(db, 'produk', item.produk_id), {
+            stok: increment(item.qty)
+          });
         }
       }
-      await deleteDoc(doc(db, 'transaksi', id));
-      alert('Transaksi berhasil dihapus dan stok sudah dikembalikan.');
-      loadData();
-    } catch (err) {
-      alert('Gagal hapus: ' + err.message);
-    }
-  };
+    }                                           
+    await deleteDoc(doc(db, 'transaksi', id));
+    alert('Transaksi berhasil dihapus dan stok sudah dikembalikan.');
+    loadData();
+  } catch (err) {
+    alert('Gagal hapus: ' + err.message);
+  }
+};                                              
 
   const hapusPembelian = async (id, produk_id, jumlah) => {
     if (!confirm('Hapus riwayat pembelian stok ini?\nStok produk akan dikurangi kembali.')) return;
