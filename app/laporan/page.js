@@ -69,11 +69,19 @@ export default function LaporanPage() {
   const [loading, setLoading] = useState(true);
   const [komoditasData, setKomoditasData] = useState({});
   const [loadingKomoditas, setLoadingKomoditas] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const today = new Date();
   const [bulan, setBulan]   = useState(today.getMonth());
   const [tahun, setTahun]   = useState(today.getFullYear());
-  const [activeView, setActiveView] = useState('ringkasan'); // ringkasan | transaksi | produk
+  const [activeView, setActiveView] = useState('ringkasan'); // ringkasan | harian | transaksi | pembelian | produk
+  const [hariDipilih, setHariDipilih] = useState(new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => {
@@ -222,6 +230,56 @@ const hapusTransaksi = async (id, items) => {
   const avgPerHari  = hariAktif > 0 ? omzet / hariAktif : 0;
   const avgTransaksi= txPeriode.length > 0 ? omzet / txPeriode.length : 0;
 
+  // ── LAPORAN HARIAN ──
+  const today2 = new Date();
+  const txHarian = transaksi.filter(t => {
+    if (!t.tanggal?.seconds) return false;
+    const d = new Date(t.tanggal.seconds * 1000);
+    return d.toISOString().slice(0, 10) === hariDipilih;
+  });
+  const omzetHari      = txHarian.reduce((s, t) => s + (t.total || 0), 0);
+  const hppHari        = txHarian.reduce((s, t) => s + (t.hpp || 0), 0);
+  const labaHari       = omzetHari - hppHari;
+  const gpmHari        = omzetHari > 0 ? (labaHari / omzetHari * 100) : 0;
+  const diskonHari     = txHarian.reduce((s, t) => s + (t.diskon || 0), 0);
+  const avgTxHari      = txHarian.length > 0 ? omzetHari / txHarian.length : 0;
+
+  // Rekap produk harian
+  const rekapHarian = {};
+  txHarian.forEach(t => {
+    t.items?.forEach(it => {
+      if (!rekapHarian[it.nama]) rekapHarian[it.nama] = { qty: 0, omzet: 0, laba: 0 };
+      rekapHarian[it.nama].qty   += it.qty || 0;
+      rekapHarian[it.nama].omzet += it.subtotal || 0;
+      rekapHarian[it.nama].laba  += it.laba || 0;
+    });
+  });
+  const rekapHarianArr = Object.entries(rekapHarian).sort((a, b) => b[1].omzet - a[1].omzet);
+
+  // Jam tersibuk
+  const perJam = {};
+  txHarian.forEach(t => {
+    if (!t.tanggal?.seconds) return;
+    const jam = new Date(t.tanggal.seconds * 1000).getHours();
+    perJam[jam] = (perJam[jam] || 0) + (t.total || 0);
+  });
+  const jamTersibuk = Object.entries(perJam).sort((a, b) => b[1] - a[1])[0];
+
+  // RSI-style momentum harian (7 hari terakhir)
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().slice(0, 10);
+  });
+  const omzetLast7 = last7Days.map(tgl =>
+    transaksi.filter(t => {
+      if (!t.tanggal?.seconds) return false;
+      return new Date(t.tanggal.seconds * 1000).toISOString().slice(0, 10) === tgl;
+    }).reduce((s, t) => s + (t.total || 0), 0)
+  );
+  const rsiHarian = rsiL(omzetLast7, Math.min(6, omzetLast7.filter(v => v > 0).length || 1));
+  const ma3Harian = maL(omzetLast7, 3);
+  const ma7Harian = maL(omzetLast7, 7);
+  const sinyalHarian = sinyalCepat(omzetLast7.filter(v => v > 0).length >= 3 ? omzetLast7 : [1, 1, 1]);
   // Inventory value
   const nilaiStok = produk.reduce((s, p) => s + (p.stok||0) * (p.harga_beli||0), 0);
 
@@ -274,18 +332,263 @@ const hapusTransaksi = async (id, items) => {
           <button style={{ ...S.btnGold, marginLeft:'auto' }} onClick={loadData}>Refresh Data</button>
         </div>
 
-        {/* View tabs */}
-        <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
+        {/* View tabs — mobile: scroll horizontal */}
+        <div style={{
+          display: 'flex',
+          borderBottom: `1px solid ${C.border}`,
+          marginBottom: 24,
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        }}>
           {[
-          ['ringkasan','Ringkasan Eksekutif'],
-          ['transaksi','Riwayat Transaksi'],
-          ['pembelian','Riwayat Pembelian Stok'],
-          ['produk','Analitik Produk'],
-        ].map(([v,l]) => (
-            <button key={v} style={tabStyle(activeView===v)} onClick={() => setActiveView(v)}>{l}</button>
+            ['ringkasan', 'Ringkasan'],
+            ['harian',    '📅 Harian'],
+            ['transaksi', 'Transaksi'],
+            ['pembelian', 'Pembelian Stok'],
+            ['produk',    'Analitik Produk'],
+          ].map(([v, l]) => (
+            <button key={v} style={{
+              ...tabStyle(activeView === v),
+              fontSize: isMobile ? 12 : 14,
+              padding:  isMobile ? '10px 12px' : '10px 20px',
+              whiteSpace: 'nowrap',
+            }} onClick={() => setActiveView(v)}>{l}</button>
           ))}
         </div>
+        {/* ══ TAB HARIAN ══ */}
+        {activeView === 'harian' && (
+          <>
+            {/* Pilih tanggal */}
+            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20, flexWrap:'wrap' }}>
+              <span style={{ fontSize:13, fontWeight:700, color:C.muted }}>TANGGAL</span>
+              <input type="date" value={hariDipilih}
+                onChange={e => setHariDipilih(e.target.value)}
+                style={{ ...S.input, width: isMobile ? '100%' : 200 }} />
+              <span style={{ fontSize:12, color:C.muted }}>{txHarian.length} transaksi</span>
+            </div>
 
+            {/* KPI Harian — scrollable */}
+            <div style={{ overflowX: isMobile ? 'auto' : 'visible', WebkitOverflowScrolling: 'touch', marginBottom:20 }}>
+              <div style={{
+                display:'grid',
+                gridTemplateColumns: isMobile ? 'repeat(4, 180px)' : 'repeat(4, 1fr)',
+                gap:12,
+                minWidth: isMobile ? 'max-content' : 'unset',
+              }}>
+                <KPICard label="Omzet Hari Ini" value={fmt(omzetHari)} sub={`${txHarian.length} transaksi`} color={C.gold} big />
+                <KPICard label="HPP" value={fmt(hppHari)} sub={`${omzetHari>0?(hppHari/omzetHari*100).toFixed(1):0}% dari omzet`} color={C.orange} />
+                <KPICard label="Laba Kotor" value={fmt(labaHari)} sub={`GPM ${gpmHari.toFixed(1)}%`} color={labaHari>=0?C.green:C.red} big />
+                <KPICard label="Avg / Transaksi" value={fmt(avgTxHari)} sub={diskonHari>0?`Diskon: ${fmt(diskonHari)}`:''} color={C.blue} />
+              </div>
+            </div>
+
+            {/* Momentum RSI 7 hari */}
+            <div style={{ ...S.card, marginBottom:20 }}>
+              <div style={{ fontWeight:700, fontSize:14, color:C.gold, marginBottom:12 }}>
+                📊 Momentum Penjualan 7 Hari (RSI-Style)
+              </div>
+              <div style={{ display:'flex', gap:8, marginBottom:14, overflowX:'auto' }}>
+                {last7Days.map((tgl, i) => {
+                  const val = omzetLast7[i];
+                  const maxVal = Math.max(...omzetLast7, 1);
+                  const isToday = tgl === new Date().toISOString().slice(0,10);
+                  const isSelected = tgl === hariDipilih;
+                  return (
+                    <div key={tgl} onClick={() => setHariDipilih(tgl)}
+                      style={{ flex:1, minWidth:60, textAlign:'center', cursor:'pointer' }}>
+                      <div style={{ fontSize:10, color: isToday ? C.gold : C.muted, fontWeight: isToday ? 700 : 400, marginBottom:4 }}>
+                        {new Date(tgl).toLocaleDateString('id-ID',{weekday:'short'})}
+                      </div>
+                      <div style={{
+                        height:60, background:'#f0f4f8', borderRadius:6, position:'relative', overflow:'hidden',
+                        border: isSelected ? `2px solid ${C.gold}` : '2px solid transparent',
+                      }}>
+                        <div style={{
+                          position:'absolute', bottom:0, left:0, right:0,
+                          height:`${val > 0 ? Math.max((val/maxVal)*100, 8) : 0}%`,
+                          background: isSelected ? C.gold : isToday ? C.green : C.blue,
+                          borderRadius:'4px 4px 0 0', transition:'height 0.3s',
+                        }}/>
+                      </div>
+                      <div style={{ fontSize:9, color:C.muted, marginTop:3 }}>
+                        {val > 0 ? (val >= 1000000 ? `${(val/1000000).toFixed(1)}jt` : `${(val/1000).toFixed(0)}rb`) : '—'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Sinyal */}
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap:10 }}>
+                <div style={{ background:'#f7fafc', borderRadius:10, padding:12 }}>
+                  <div style={{ fontSize:11, color:C.muted, fontWeight:700, marginBottom:4 }}>RSI OMZET (7H)</div>
+                  <div style={{ fontSize:20, fontWeight:700,
+                    color: rsiHarian === null ? C.muted : rsiHarian < 30 ? C.green : rsiHarian > 70 ? C.red : C.text }}>
+                    {rsiHarian !== null ? rsiHarian.toFixed(0) : '—'}
+                  </div>
+                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>
+                    {rsiHarian === null ? 'Data belum cukup' :
+                      rsiHarian < 30 ? '🟢 Penjualan lemah — momentum beli stok' :
+                      rsiHarian > 70 ? '🔴 Penjualan tinggi — pertahankan stok' :
+                      '➖ Normal'}
+                  </div>
+                </div>
+                <div style={{ background:'#f7fafc', borderRadius:10, padding:12 }}>
+                  <div style={{ fontSize:11, color:C.muted, fontWeight:700, marginBottom:4 }}>MA3 vs MA7</div>
+                  <div style={{ fontSize:16, fontWeight:700,
+                    color: ma3Harian && ma7Harian ? (ma3Harian > ma7Harian ? C.green : C.red) : C.muted }}>
+                    {ma3Harian && ma7Harian ? (ma3Harian > ma7Harian ? '↑ Tren Naik' : '↓ Tren Turun') : '—'}
+                  </div>
+                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>
+                    MA3: {ma3Harian ? fmt(ma3Harian) : '—'} · MA7: {ma7Harian ? fmt(ma7Harian) : '—'}
+                  </div>
+                </div>
+                <div style={{ background:'#f7fafc', borderRadius:10, padding:12 }}>
+                  <div style={{ fontSize:11, color:C.muted, fontWeight:700, marginBottom:4 }}>JAM TERSIBUK</div>
+                  <div style={{ fontSize:20, fontWeight:700, color:C.orange }}>
+                    {jamTersibuk ? `${jamTersibuk[0]}:00` : '—'}
+                  </div>
+                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>
+                    {jamTersibuk ? fmt(jamTersibuk[1]) : 'Belum ada transaksi'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Insight harian */}
+            <div style={{ ...S.card, marginBottom:20 }}>
+              <div style={{ fontWeight:700, fontSize:14, color:C.gold, marginBottom:12 }}>
+                💡 Insight & Rekomendasi Hari Ini
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:10 }}>
+                <div style={{ background: gpmHari>=30?'#f0fdf4':gpmHari>=15?'#fffbeb':'#fef2f2', borderRadius:10, padding:12 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.muted, marginBottom:4 }}>MARGIN HARI INI</div>
+                  <div style={{ fontSize:13, color: gpmHari>=30?C.green:gpmHari>=15?C.orange:omzetHari===0?C.muted:C.red }}>
+                    {omzetHari===0 ? 'Belum ada transaksi hari ini.' :
+                      gpmHari>=30 ? `GPM ${gpmHari.toFixed(1)}% — Hari yang bagus! Margin sehat.` :
+                      gpmHari>=15 ? `GPM ${gpmHari.toFixed(1)}% — Margin sedang. Cek produk diskon besar.` :
+                      `GPM ${gpmHari.toFixed(1)}% — Margin tipis. Perlu evaluasi harga jual hari ini.`}
+                  </div>
+                </div>
+                {rekapHarianArr[0] && (
+                  <div style={{ background:'#f0f9ff', borderRadius:10, padding:12 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:C.muted, marginBottom:4 }}>TOP SELLER HARI INI</div>
+                    <div style={{ fontSize:13, color:C.blue }}>
+                      {rekapHarianArr[0][0]}: {rekapHarianArr[0][1].qty} unit · {fmt(rekapHarianArr[0][1].omzet)}
+                    </div>
+                  </div>
+                )}
+                <div style={{ background:'#f7fafc', borderRadius:10, padding:12 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.muted, marginBottom:4 }}>REKOMENDASI STOK</div>
+                  <div style={{ fontSize:13, color:C.text }}>
+                    {rsiHarian === null ? 'Data 7 hari belum lengkap.' :
+                      rsiHarian < 30 && ma3Harian && ma7Harian && ma3Harian < ma7Harian
+                        ? '🟢 Penjualan sedang lesu — waktu tepat negosiasi & beli stok di harga lebih baik.'
+                        : rsiHarian > 70
+                        ? '🔴 Penjualan tinggi — pastikan stok cukup, waspadai kehabisan produk laris.'
+                        : ma3Harian && ma7Harian && ma3Harian > ma7Harian
+                        ? '📈 Tren penjualan membaik — siapkan stok produk terlaris 2–3 hari ke depan.'
+                        : '➖ Kondisi normal — pantau stok menipis dan restock sesuai jadwal.'}
+                  </div>
+                </div>
+                <div style={{ background:'#f7fafc', borderRadius:10, padding:12 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.muted, marginBottom:4 }}>PRODUKTIVITAS</div>
+                  <div style={{ fontSize:13, color:C.text }}>
+                    {txHarian.length} transaksi · avg {fmt(avgTxHari)}/tx
+                    {diskonHari > 0 ? ` · Diskon diberikan: ${fmt(diskonHari)}` : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Rekap produk harian */}
+            <div style={{ ...S.card, marginBottom:20, overflowX:'auto' }}>
+              <div style={{ fontWeight:700, fontSize:14, color:C.gold, marginBottom:12 }}>
+                Rekap Produk Terjual Hari Ini
+              </div>
+              {rekapHarianArr.length === 0 ? (
+                <div style={{ color:C.muted, padding:20, textAlign:'center' }}>
+                  Belum ada penjualan pada tanggal ini.
+                </div>
+              ) : (
+                <table style={S.table}>
+                  <thead><tr>
+                    <th style={S.th}>Produk</th>
+                    <th style={S.th}>Qty Terjual</th>
+                    <th style={S.th}>Omzet</th>
+                    <th style={S.th}>Laba</th>
+                    <th style={S.th}>Kontribusi</th>
+                  </tr></thead>
+                  <tbody>
+                    {rekapHarianArr.map(([nama, r]) => (
+                      <tr key={nama}>
+                        <td style={{ ...S.td, fontWeight:600 }}>{nama}</td>
+                        <td style={S.td}>{r.qty}</td>
+                        <td style={{ ...S.td, color:C.gold, fontWeight:700 }}>{fmt(r.omzet)}</td>
+                        <td style={{ ...S.td, color:r.laba>=0?C.green:C.red, fontWeight:600 }}>{fmt(r.laba)}</td>
+                        <td style={S.td}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <div style={{ background:'#f0f4f8', borderRadius:4, height:8, width:80, overflow:'hidden' }}>
+                              <div style={{ height:'100%', width:`${omzetHari>0?(r.omzet/omzetHari*100):0}%`,
+                                background:C.gold, borderRadius:4 }} />
+                            </div>
+                            <span style={{ fontSize:11, color:C.muted }}>
+                              {omzetHari>0?(r.omzet/omzetHari*100).toFixed(1):0}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Daftar transaksi harian */}
+            <div style={{ ...S.card, overflowX:'auto' }}>
+              <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>
+                Detail Transaksi — {new Date(hariDipilih).toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+              </div>
+              <table style={S.table}>
+                <thead><tr>
+                  <th style={S.th}>Jam</th>
+                  <th style={S.th}>Pembeli</th>
+                  <th style={S.th}>Kasir</th>
+                  <th style={S.th}>Item</th>
+                  <th style={S.th}>Total</th>
+                  <th style={S.th}>HPP</th>
+                  <th style={S.th}>Laba</th>
+                  <th style={S.th}>Aksi</th>
+                </tr></thead>
+                <tbody>
+                  {txHarian.length === 0 ? (
+                    <tr><td colSpan={8} style={{ ...S.td, textAlign:'center', color:C.muted, padding:30 }}>
+                      Tidak ada transaksi pada tanggal ini.
+                    </td></tr>
+                  ) : txHarian.map(t => (
+                    <tr key={t.id}>
+                      <td style={{ ...S.td, fontSize:12, color:C.muted, whiteSpace:'nowrap' }}>
+                        {t.tanggal?.seconds
+                          ? new Date(t.tanggal.seconds*1000).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})
+                          : '—'}
+                      </td>
+                      <td style={S.td}>{t.namaPembeli}</td>
+                      <td style={{ ...S.td, fontSize:11, color:C.muted }}>{t.kasir?.split('@')[0]}</td>
+                      <td style={{ ...S.td, fontSize:11, color:C.muted }}>
+                        {t.items?.map((it,i) => <div key={i}>{it.nama} ×{it.qty}</div>)}
+                      </td>
+                      <td style={{ ...S.td, fontWeight:700, color:C.gold }}>{fmt(t.total)}</td>
+                      <td style={{ ...S.td, color:C.muted }}>{fmt(t.hpp||0)}</td>
+                      <td style={{ ...S.td, fontWeight:600, color:(t.laba||0)>=0?C.green:C.red }}>{fmt(t.laba||0)}</td>
+                      <td style={S.td}>
+                        <button onClick={() => hapusTransaksi(t.id, t.items)} style={S.btnDanger}>Hapus</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}  
         {/* ── RINGKASAN ── */}
         {activeView === 'ringkasan' && (
           <>
@@ -293,21 +596,36 @@ const hapusTransaksi = async (id, items) => {
             <div style={{ fontSize:11, color:C.muted, letterSpacing:1, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>
               KPI Utama — {BULAN[bulan]} {tahun}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
-              <KPICard label="Total Omzet" value={fmt(omzet)} sub={`${txPeriode.length} transaksi`} color={C.gold} growth={gOmzet} big />
-              <KPICard label="HPP (Harga Pokok)" value={fmt(hpp)} sub={`${omzet>0?(hpp/omzet*100).toFixed(1):0}% dari omzet`} color={C.orange} />
-              <KPICard label="Laba Kotor" value={fmt(labaKotor)} sub={`GPM ${gpm.toFixed(1)}%`} color={labaKotor>=0?C.green:C.red} growth={gLaba} big />
-              <KPICard label="Nilai Inventori" value={fmt(nilaiStok)} sub="harga beli stok saat ini" color={C.blue} />
+            {/* KPI row 1 — scrollable di mobile */}
+            <div style={{ overflowX: isMobile ? 'auto' : 'visible', WebkitOverflowScrolling: 'touch', marginBottom: 14 }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? 'repeat(4, 200px)' : 'repeat(4,1fr)',
+                gap: 14,
+                minWidth: isMobile ? 'max-content' : 'unset',
+              }}>
+                <KPICard label="Total Omzet" value={fmt(omzet)} sub={`${txPeriode.length} transaksi`} color={C.gold} growth={gOmzet} big />
+                <KPICard label="HPP (Harga Pokok)" value={fmt(hpp)} sub={`${omzet>0?(hpp/omzet*100).toFixed(1):0}% dari omzet`} color={C.orange} />
+                <KPICard label="Laba Kotor" value={fmt(labaKotor)} sub={`GPM ${gpm.toFixed(1)}%`} color={labaKotor>=0?C.green:C.red} growth={gLaba} big />
+                <KPICard label="Nilai Inventori" value={fmt(nilaiStok)} sub="harga beli stok saat ini" color={C.blue} />
+              </div>
             </div>
-
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
-              <KPICard label="Rata-rata / Transaksi" value={fmt(avgTransaksi)} color={C.text} />
-              <KPICard label="Omzet / Hari Aktif" value={fmt(avgPerHari)} sub={`${hariAktif} hari ada transaksi`} color={C.text} />
-              <KPICard label="Gross Profit Margin"
-                value={`${gpm.toFixed(1)}%`}
-                sub={gpm>=30?'Margin sehat':gpm>=15?'Perlu ditingkatkan':'Margin tipis'}
-                color={gpm>=30?C.green:gpm>=15?C.orange:C.red} />
-              <KPICard label="Pembelian Stok (HPP Beli)" value={fmt(hppBeli)} sub={`${bliPeriode.length} pembelian`} color={C.red} />
+            {/* KPI row 2 */}
+            <div style={{ overflowX: isMobile ? 'auto' : 'visible', WebkitOverflowScrolling: 'touch', marginBottom: 24 }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? 'repeat(4, 200px)' : 'repeat(4,1fr)',
+                gap: 14,
+                minWidth: isMobile ? 'max-content' : 'unset',
+              }}>
+                <KPICard label="Rata-rata / Transaksi" value={fmt(avgTransaksi)} color={C.text} />
+                <KPICard label="Omzet / Hari Aktif" value={fmt(avgPerHari)} sub={`${hariAktif} hari ada transaksi`} color={C.text} />
+                <KPICard label="Gross Profit Margin"
+                  value={`${gpm.toFixed(1)}%`}
+                  sub={gpm>=30?'Margin sehat':gpm>=15?'Perlu ditingkatkan':'Margin tipis'}
+                  color={gpm>=30?C.green:gpm>=15?C.orange:C.red} />
+                <KPICard label="Pembelian Stok (HPP Beli)" value={fmt(hppBeli)} sub={`${bliPeriode.length} pembelian`} color={C.red} />
+              </div>
             </div>
             {/* ── PANEL KOMODITAS MINI ── */}
             <div style={{ marginBottom:24 }}>
@@ -526,7 +844,7 @@ const hapusTransaksi = async (id, items) => {
 
         {/* ── RIWAYAT TRANSAKSI ── */}
         {activeView === 'transaksi' && (
-          <div style={S.card}>
+          <div style={{ ...S.card, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>
               Riwayat Transaksi — {BULAN[bulan]} {tahun} ({txPeriode.length} transaksi)
             </div>
