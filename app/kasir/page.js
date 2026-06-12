@@ -170,17 +170,19 @@ export default function KasirPage() {
   <title>Struk AM Bangunan</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: monospace; font-size: 12px; width: 300px; margin: 0 auto; padding: 16px; }
+    body { font-family: monospace; font-size: 11px; width: 58mm; margin: 0; padding: 4mm 2mm; }
     .toko { text-align:center; margin-bottom:12px; }
-    .toko h2 { font-size:16px; font-weight:900; letter-spacing:1px; }
-    .toko p { font-size:11px; color:#555; margin-top:2px; }
+    .toko h2 { font-size:13px; font-weight:900; letter-spacing:0.5px; }
+    .toko p { font-size:9px; color:#555; margin-top:1px; }
     .garis { border-top:1px dashed #000; margin:8px 0; }
     table { width:100%; border-collapse:collapse; }
-    th { font-size:10px; text-align:left; padding:4px 0; border-bottom:1px solid #ccc; }
-    .total-row { font-size:14px; font-weight:bold; }
+    th { font-size:9px; text-align:left; padding:3px 0; border-bottom:1px solid #ccc; }
+    td { font-size:10px; }
+    .total-row { font-size:12px; font-weight:bold; }
     .footer { text-align:center; font-size:11px; color:#555; margin-top:12px; }
     @media print {
-      body { width:100%; }
+      @page { margin: 0; size: 58mm auto; }
+      body { width: 58mm; padding: 2mm; }
       button { display:none !important; }
     }
   </style>
