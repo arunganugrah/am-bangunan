@@ -10,6 +10,55 @@ import Navbar from '@/components/Navbar';
 import { C, S, fmt, fmtTgl, fmtTglShort, BULAN } from '@/components/theme';
 
 const ADMIN_EMAIL = 'admin@ambangunan.com';
+const AV_KEY = 'XXXXXXXXXXXXXXXX'; // ← API key Alpha Vantage kamu
+
+// Komoditas + proxy materialnya
+const KOMODITAS_PANEL = [
+  { key:'COPPER',      label:'Tembaga',     icon:'🔴', proxy:'Besi beton, kawat, hollow, kanal' },
+  { key:'ALUMINUM',    label:'Aluminium',   icon:'⚪', proxy:'Seng, kawat seng, rangka atap'   },
+  { key:'WTI',         label:'Minyak WTI',  icon:'🛢️', proxy:'Biaya logistik, ongkir semua material' },
+  { key:'NATURAL_GAS', label:'Gas Alam',    icon:'💨', proxy:'Pipa PVC, plastik, produk petrokimia'  },
+];
+
+// Fungsi kalkulasi sinyal — sama seperti di komoditas/page.js
+function maL(prices, n) {
+  if (prices.length < n) return null;
+  return prices.slice(-n).reduce((a, b) => a + b, 0) / n;
+}
+function rsiL(prices, period = 14) {
+  if (prices.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = prices.length - period; i < prices.length; i++) {
+    const diff = prices[i] - prices[i - 1];
+    if (diff > 0) gains += diff; else losses += Math.abs(diff);
+  }
+  const avgLoss = losses / period;
+  if (avgLoss === 0) return 100;
+  return 100 - (100 / (1 + (gains / period) / avgLoss));
+}
+function sinyalCepat(prices) {
+  if (!prices || prices.length < 5) return null;
+  const last  = prices[prices.length - 1];
+  const prev  = prices[prices.length - 2];
+  const pct   = ((last - prev) / prev) * 100;
+  const rsi   = rsiL(prices);
+  const ma5v  = maL(prices, 5);
+  const ma20v = maL(prices, 20);
+
+  let skor = 0;
+  if (rsi !== null) { if (rsi < 30) skor += 2; else if (rsi > 70) skor -= 2; }
+  if (ma5v && ma20v) { if (ma5v > ma20v) skor += 1; else skor -= 1; }
+  if (pct > 2) skor -= 1; else if (pct < -2) skor += 1; // harga naik = waspada beli
+
+  let saran, warna, bg;
+  if (skor >= 2)       { saran = '🟢 BELI STOK';    warna = '#16a34a'; bg = '#f0fdf4'; }
+  else if (skor >= 1)  { saran = '📈 Pertimbangkan'; warna = '#d97706'; bg = '#fffbeb'; }
+  else if (skor <= -2) { saran = '🔴 TAHAN/JUAL';   warna = '#dc2626'; bg = '#fef2f2'; }
+  else if (skor <= -1) { saran = '⏳ Tunggu Dulu';  warna = '#9333ea'; bg = '#faf5ff'; }
+  else                 { saran = '➖ Netral';        warna = C.muted;   bg = '#f7fafc'; }
+
+  return { pct, rsi, ma5v, ma20v, skor, saran, warna, bg };
+}
 
 export default function LaporanPage() {
   const router   = useRouter();
@@ -18,6 +67,8 @@ export default function LaporanPage() {
   const [pembelian, setPembelian] = useState([]);
   const [produk, setProduk]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const [komoditasData, setKomoditasData] = useState({});
+  const [loadingKomoditas, setLoadingKomoditas] = useState(false);
 
   const today = new Date();
   const [bulan, setBulan]   = useState(today.getMonth());
@@ -33,6 +84,7 @@ export default function LaporanPage() {
       }
       setUser(u);
       loadData();
+      fetchKomoditas();
     });
     return unsub;
   }, []);
@@ -74,6 +126,23 @@ const hapusTransaksi = async (id, items) => {
     } catch (err) {
       alert('Gagal hapus: ' + err.message);
     }
+  };
+  const fetchKomoditas = async () => {
+    setLoadingKomoditas(true);
+    const hasil = {};
+    for (const c of KOMODITAS_PANEL) {
+      try {
+        const url  = `https://www.alphavantage.co/query?function=${c.key}&interval=monthly&apikey=${AV_KEY}`;
+        const res  = await fetch(url);
+        const json = await res.json();
+        const raw  = json?.data;
+        if (!raw || raw.length < 5) continue;
+        const prices = raw.slice(0, 30).reverse().map(d => parseFloat(d.value));
+        hasil[c.key] = { ...sinyalCepat(prices), last: prices[prices.length - 1] };
+      } catch(e) { console.error(c.key, e); }
+    }
+    setKomoditasData(hasil);
+    setLoadingKomoditas(false);
   };
   const loadData = async () => {
     setLoading(true);
@@ -239,6 +308,81 @@ const hapusTransaksi = async (id, items) => {
                 sub={gpm>=30?'Margin sehat':gpm>=15?'Perlu ditingkatkan':'Margin tipis'}
                 color={gpm>=30?C.green:gpm>=15?C.orange:C.red} />
               <KPICard label="Pembelian Stok (HPP Beli)" value={fmt(hppBeli)} sub={`${bliPeriode.length} pembelian`} color={C.red} />
+            </div>
+            {/* ── PANEL KOMODITAS MINI ── */}
+            <div style={{ marginBottom:24 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                <div style={{ fontSize:11, color:C.muted, fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
+                  Sinyal Komoditas Global — Pengaruh ke Harga Material
+                </div>
+                <button
+                  onClick={fetchKomoditas}
+                  disabled={loadingKomoditas}
+                  style={{ ...S.btnGhost, fontSize:11, padding:'4px 12px' }}>
+                  {loadingKomoditas ? '⏳' : '🔄 Refresh'}
+                </button>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:10 }}>
+                {KOMODITAS_PANEL.map(c => {
+                  const d = komoditasData[c.key];
+                  return (
+                    <div key={c.key} style={{
+                      background: d ? d.bg : C.bgCard,
+                      border: `1px solid ${d ? d.warna + '40' : C.border}`,
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                    }}>
+                      {/* Header */}
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                        <div style={{ fontSize:13, fontWeight:700 }}>
+                          {c.icon} {c.label}
+                        </div>
+                        {d && (
+                          <span style={{ fontSize:12, fontWeight:700, color: d.pct >= 0 ? '#dc2626' : '#16a34a' }}>
+                            {d.pct >= 0 ? '▲' : '▼'} {Math.abs(d.pct).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Proxy material */}
+                      <div style={{ fontSize:10, color:C.muted, marginBottom:8, lineHeight:1.4 }}>
+                        {c.proxy}
+                      </div>
+
+                      {/* Sinyal */}
+                      {!d && (
+                        <div style={{ fontSize:11, color:C.muted }}>
+                          {loadingKomoditas ? '⏳ Memuat...' : 'Klik Refresh'}
+                        </div>
+                      )}
+                      {d && (
+                        <>
+                          <div style={{ fontWeight:700, fontSize:12, color:d.warna, marginBottom:6 }}>
+                            {d.saran}
+                          </div>
+                          <div style={{ fontSize:10, color:C.muted }}>
+                            RSI: <strong style={{ color: d.rsi < 30 ? '#16a34a' : d.rsi > 70 ? '#dc2626' : C.text }}>
+                              {d.rsi?.toFixed(0) ?? '—'}
+                            </strong>
+                            {' · '}
+                            MA: <strong style={{ color: d.ma5v > d.ma20v ? '#16a34a' : '#dc2626' }}>
+                              {d.ma5v && d.ma20v ? (d.ma5v > d.ma20v ? '↑' : '↓') : '—'}
+                            </strong>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Catatan korelasi */}
+              <div style={{ fontSize:11, color:C.muted, marginTop:8, padding:'8px 12px',
+                background:'#fffbeb', borderRadius:8, border:'1px solid #fde68a' }}>
+                💡 <strong>Cara baca:</strong> Tembaga & Aluminium naik → harga besi beton/kawat/seng lokal biasanya ikut naik dalam 2–4 minggu.
+                Gas Alam & WTI naik → harga PVC & ongkos kirim naik. Sinyal <strong>BELI STOK</strong> = harga sedang murah, kemungkinan naik.
+              </div>
             </div>
 
             {/* Tren Mingguan + Perbandingan */}
