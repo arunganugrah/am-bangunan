@@ -26,6 +26,13 @@ export default function StokPage() {
   const emptyForm = { kode:'', nama:'', satuan:'pcs', stok:'', kategori_id:'', keterangan:'' };
   const [formBaru, setFormBaru] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => {
