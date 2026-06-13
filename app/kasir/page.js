@@ -317,7 +317,7 @@ export default function KasirPage() {
   });
 
   // ✅ Tinggi konten: desktop 60px navbar, mobile 60px navbar + 48px tab bar
-  const contentHeight = isMobile ? 'calc(100vh - 108px)' : 'calc(100vh - 60px)';
+  const contentHeight = isMobile ? 'calc(100vh - 162px)' : 'calc(100vh - 60px)';
 
   return (
     <div style={{ minHeight:'100vh', background:C.bgPage, color:C.text }}>
