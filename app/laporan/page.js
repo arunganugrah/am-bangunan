@@ -69,6 +69,7 @@ export default function LaporanPage() {
   const [loading, setLoading] = useState(true);
   const [komoditasData, setKomoditasData] = useState({});
   const [loadingKomoditas, setLoadingKomoditas] = useState(false);
+  const [komoditasProgress, setKomoditasProgress] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -136,49 +137,86 @@ const hapusTransaksi = async (id, items) => {
     }
   };
   const fetchKomoditas = async () => {
+    // ── Cek cache sessionStorage dulu ──
+    // Jika data masih fresh (< 60 menit), pakai cache, tidak fetch ulang
+    const CACHE_KEY = 'komoditas_cache';
+    const CACHE_TTL = 60 * 60 * 1000; // 60 menit dalam ms
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_TTL) {
+          setKomoditasData(data);
+          return; // pakai cache, tidak fetch ke API
+        }
+      }
+    } catch(e) {}
+
     setLoadingKomoditas(true);
-    const fetchSatu = async (c) => {
+    const hasil = {};
+    let rateLimitHit = false;
+
+    // ── Sequential fetch dengan delay 15 detik antar request ──
+    // Ini menghindari rate limit 5 req/menit dari Alpha Vantage
+    for (const c of KOMODITAS_PANEL) {
+      if (rateLimitHit) break; // stop jika sudah kena limit
       try {
         const url  = `https://www.alphavantage.co/query?function=${c.key}&interval=monthly&apikey=${AV_KEY}`;
         const res  = await fetch(url);
         const json = await res.json();
-        // Alpha Vantage: WTI & NATURAL_GAS pakai key "data", COPPER & ALUMINUM juga
-        const raw  = json?.data;
-        if (!raw || !Array.isArray(raw) || raw.length < 5) {
-          console.warn(c.key, 'data kosong atau format berbeda:', json);
-          return [c.key, null];
+
+        // ── Deteksi rate limit / API key issue ──
+        if (json?.Note || json?.Information) {
+          console.warn('Alpha Vantage rate limit/info:', json.Note || json.Information);
+          rateLimitHit = true;
+          break;
         }
+
+        const raw = json?.data;
+        if (!raw || !Array.isArray(raw) || raw.length < 5) {
+          console.warn(c.key, 'format tidak dikenali:', Object.keys(json));
+          continue; // skip item ini, lanjut ke berikutnya
+        }
+
         const prices = raw
           .slice(0, 30)
           .reverse()
           .map(d => parseFloat(d.value))
           .filter(v => !isNaN(v));
-        if (prices.length < 5) return [c.key, null];
-        return [c.key, { ...sinyalCepat(prices), last: prices[prices.length - 1] }];
-      } catch(e) {
-        console.error(c.key, e);
-        return [c.key, null];
-      }
-    };
 
-    // Fetch semua sekaligus (paralel)
-    const results = await Promise.all(KOMODITAS_PANEL.map(fetchSatu));
-    const hasil = {};
-    results.forEach(([key, val]) => { if (val) hasil[key] = val; });
+        if (prices.length >= 5) {
+          hasil[c.key] = { ...sinyalCepat(prices), last: prices[prices.length - 1] };
+        }
+
+      } catch(e) {
+        console.error(c.key, e.message);
+        continue; // error jaringan = skip, jangan stop semua
+      }
+
+      // ── Delay 13 detik antar request (aman di bawah 5 req/menit) ──
+      // Hanya delay jika masih ada item berikutnya
+      const idx = KOMODITAS_PANEL.indexOf(c);
+      if (idx < KOMODITAS_PANEL.length - 1) {
+        // Update progress label
+        const next = KOMODITAS_PANEL[idx + 1];
+        if (next) setKomoditasProgress(`Mengambil ${next.label}...`);
+        await new Promise(r => setTimeout(r, 13000));
+      }
+    }
+
+    // ── Simpan ke cache sessionStorage ──
+    if (Object.keys(hasil).length > 0) {
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+          data: hasil,
+          timestamp: Date.now(),
+        }));
+      } catch(e) {}
+    }
+
     setKomoditasData(hasil);
     setLoadingKomoditas(false);
-  };
-  const loadData = async () => {
-    setLoading(true);
-    const [tSnap, bSnap, pSnap] = await Promise.all([
-      getDocs(query(collection(db, 'transaksi'), orderBy('tanggal', 'desc'))),
-      getDocs(query(collection(db, 'pembelian_stok'), orderBy('tanggal', 'desc'))),
-      getDocs(collection(db, 'produk')),
-    ]);
-    setTransaksi(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setPembelian(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setLoading(false);
+    setKomoditasProgress('');
   };
 
   // Filter helpers
@@ -649,12 +687,19 @@ const hapusTransaksi = async (id, items) => {
                 <div style={{ fontSize:11, color:C.muted, fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
                   Sinyal Komoditas Global — Pengaruh ke Harga Material
                 </div>
-                <button
-                  onClick={fetchKomoditas}
-                  disabled={loadingKomoditas}
-                  style={{ ...S.btnGhost, fontSize:11, padding:'4px 12px' }}>
-                  {loadingKomoditas ? '⏳' : '🔄 Refresh'}
-                </button>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  {loadingKomoditas && komoditasProgress && (
+                    <span style={{ fontSize:10, color:C.muted }}>
+                      {komoditasProgress} (~{KOMODITAS_PANEL.length * 13}d)
+                    </span>
+                  )}
+                  <button
+                    onClick={fetchKomoditas}
+                    disabled={loadingKomoditas}
+                    style={{ ...S.btnGhost, fontSize:11, padding:'4px 12px' }}>
+                    {loadingKomoditas ? '⏳ Mengambil...' : '🔄 Refresh'}
+                  </button>
+                </div>
               </div>
 
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:10 }}>
@@ -686,8 +731,12 @@ const hapusTransaksi = async (id, items) => {
 
                       {/* Sinyal */}
                       {!d && (
-                        <div style={{ fontSize:11, color:C.muted }}>
-                          {loadingKomoditas ? '⏳ Memuat...' : 'Klik Refresh'}
+                        <div style={{ fontSize:11, color:C.muted, lineHeight:1.5 }}>
+                          {loadingKomoditas
+                            ? '⏳ Mengambil data...'
+                            : Object.keys(komoditasData).length > 0
+                            ? '⚠️ Data tidak tersedia\n(rate limit API)'
+                            : 'Klik Refresh untuk ambil data'}
                         </div>
                       )}
                       {d && (
@@ -727,6 +776,24 @@ const hapusTransaksi = async (id, items) => {
                   <div>➖ <strong>Netral</strong> = Tidak ada sinyal kuat, beli sesuai kebutuhan normal saja.</div>
                   <div><strong>RSI &lt; 30</strong> = Harga sudah terlalu murah (oversold) → potensi naik. <strong>RSI &gt; 70</strong> = Harga sudah mahal (overbought) → waspada.</div>
                 </div>
+              {/* Warning jika data parsial */}
+              {!loadingKomoditas && Object.keys(komoditasData).length > 0 &&
+               Object.keys(komoditasData).length < KOMODITAS_PANEL.length && (
+                <div style={{ fontSize:11, color:C.orange, marginTop:8, padding:'8px 12px',
+                  background:'#fff7ed', borderRadius:8, border:`1px solid ${C.orange}40` }}>
+                  ⚠️ {KOMODITAS_PANEL.length - Object.keys(komoditasData).length} komoditas tidak berhasil dimuat
+                  (kemungkinan rate limit API). Data cache dipakai jika tersedia.
+                  Coba Refresh setelah 1 menit.
+                </div>
+              )}
+              {!loadingKomoditas && Object.keys(komoditasData).length === 0 && (
+                <div style={{ fontSize:11, color:C.muted, marginTop:8, padding:'8px 12px',
+                  background:'#f7fafc', borderRadius:8, textAlign:'center' }}>
+                  Klik <strong>🔄 Refresh</strong> untuk mengambil data komoditas.
+                  Proses membutuhkan ~{Math.ceil(KOMODITAS_PANEL.length * 13 / 60)} menit
+                  karena dibatasi API gratis.
+                </div>
+              )}
               </div>
             </div>
 
