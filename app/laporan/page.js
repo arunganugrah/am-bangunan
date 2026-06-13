@@ -218,7 +218,22 @@ const hapusTransaksi = async (id, items) => {
     setLoadingKomoditas(false);
     setKomoditasProgress('');
   };
-
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [tSnap, bSnap, pSnap] = await Promise.all([
+        getDocs(query(collection(db, 'transaksi'), orderBy('tanggal', 'desc'))),
+        getDocs(query(collection(db, 'pembelian_stok'), orderBy('tanggal', 'desc'))),
+        getDocs(collection(db, 'produk')),
+      ]);
+      setTransaksi(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setPembelian(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setProduk(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch(err) {
+      console.error('loadData error:', err.message);
+    }
+    setLoading(false);
+  };
   // Filter helpers
   const inPeriode = (ts, b, t) => {
     if (!ts?.seconds) return false;
