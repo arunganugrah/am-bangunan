@@ -10,7 +10,7 @@ import Navbar from '@/components/Navbar';
 import { C, S, fmt, fmtTgl, fmtTglShort, BULAN } from '@/components/theme';
 
 const ADMIN_EMAIL = 'admin@ambangunan.com';
-const AV_KEY = 'XXXXXXXXXXXXXXXX'; // ← API key Alpha Vantage kamu
+const AV_KEY = 'XH1VX02QCPR3JBPH'; // ← API key Alpha Vantage kamu
 
 // Komoditas + proxy materialnya
 const KOMODITAS_PANEL = [
@@ -137,18 +137,34 @@ const hapusTransaksi = async (id, items) => {
   };
   const fetchKomoditas = async () => {
     setLoadingKomoditas(true);
-    const hasil = {};
-    for (const c of KOMODITAS_PANEL) {
+    const fetchSatu = async (c) => {
       try {
         const url  = `https://www.alphavantage.co/query?function=${c.key}&interval=monthly&apikey=${AV_KEY}`;
         const res  = await fetch(url);
         const json = await res.json();
+        // Alpha Vantage: WTI & NATURAL_GAS pakai key "data", COPPER & ALUMINUM juga
         const raw  = json?.data;
-        if (!raw || raw.length < 5) continue;
-        const prices = raw.slice(0, 30).reverse().map(d => parseFloat(d.value));
-        hasil[c.key] = { ...sinyalCepat(prices), last: prices[prices.length - 1] };
-      } catch(e) { console.error(c.key, e); }
-    }
+        if (!raw || !Array.isArray(raw) || raw.length < 5) {
+          console.warn(c.key, 'data kosong atau format berbeda:', json);
+          return [c.key, null];
+        }
+        const prices = raw
+          .slice(0, 30)
+          .reverse()
+          .map(d => parseFloat(d.value))
+          .filter(v => !isNaN(v));
+        if (prices.length < 5) return [c.key, null];
+        return [c.key, { ...sinyalCepat(prices), last: prices[prices.length - 1] }];
+      } catch(e) {
+        console.error(c.key, e);
+        return [c.key, null];
+      }
+    };
+
+    // Fetch semua sekaligus (paralel)
+    const results = await Promise.all(KOMODITAS_PANEL.map(fetchSatu));
+    const hasil = {};
+    results.forEach(([key, val]) => { if (val) hasil[key] = val; });
     setKomoditasData(hasil);
     setLoadingKomoditas(false);
   };
@@ -318,7 +334,7 @@ const hapusTransaksi = async (id, items) => {
         { href:'/admin', label:'Admin' },
       ]} />
 
-      <div style={{ padding:'24px 28px' }}>
+      <div style={{ padding: isMobile ? '16px 14px 80px' : '24px 28px' }}>
         {/* Periode Selector */}
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:24, flexWrap:'wrap' }}>
           <span style={{ fontSize:13, fontWeight:700, color:C.muted }}>PERIODE</span>
@@ -696,10 +712,21 @@ const hapusTransaksi = async (id, items) => {
               </div>
 
               {/* Catatan korelasi */}
-              <div style={{ fontSize:11, color:C.muted, marginTop:8, padding:'8px 12px',
-                background:'#fffbeb', borderRadius:8, border:'1px solid #fde68a' }}>
-                💡 <strong>Cara baca:</strong> Tembaga & Aluminium naik → harga besi beton/kawat/seng lokal biasanya ikut naik dalam 2–4 minggu.
-                Gas Alam & WTI naik → harga PVC & ongkos kirim naik. Sinyal <strong>BELI STOK</strong> = harga sedang murah, kemungkinan naik.
+              <div style={{ fontSize:11, color:C.muted, marginTop:8, padding:'12px 14px',
+                background:'#fffbeb', borderRadius:8, border:'1px solid #fde68a', lineHeight:1.7 }}>
+                <div style={{ fontWeight:700, color:'#92400e', marginBottom:6 }}>💡 Cara Membaca Sinyal Komoditas</div>
+                <div style={{ marginBottom:6 }}>
+                  <strong>Pengaruh ke toko:</strong> Tembaga & Aluminium naik → harga besi beton/kawat/seng lokal ikut naik dalam 2–4 minggu.
+                  Minyak WTI & Gas Alam naik → ongkos kirim & harga PVC/plastik naik.
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:'4px 16px' }}>
+                  <div>🟢 <strong>BELI STOK</strong> = Harga bahan baku lagi murah, bagus untuk beli & simpan stok sekarang.</div>
+                  <div>📈 <strong>Pertimbangkan</strong> = Harga mulai bergerak naik, segera putuskan mau beli atau tidak.</div>
+                  <div>⏳ <strong>Tunggu Dulu</strong> = Harga masih tidak menentu, lebih baik tahan dulu pembelian besar.</div>
+                  <div>🔴 <strong>TAHAN/JUAL</strong> = Harga sedang tinggi & kemungkinan turun, jangan beli stok besar sekarang.</div>
+                  <div>➖ <strong>Netral</strong> = Tidak ada sinyal kuat, beli sesuai kebutuhan normal saja.</div>
+                  <div><strong>RSI &lt; 30</strong> = Harga sudah terlalu murah (oversold) → potensi naik. <strong>RSI &gt; 70</strong> = Harga sudah mahal (overbought) → waspada.</div>
+                </div>
               </div>
             </div>
 
