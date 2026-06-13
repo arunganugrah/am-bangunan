@@ -265,7 +265,7 @@ await secondaryAuth.signOut(); // langsung logout dari secondary
         { href:'/laporan', label:'Laporan' },
       ]} />
 
-      <div style={{ padding: isMobile ? '12px 14px' : '24px 28px' }}>
+      <div style={{ padding: isMobile ? '12px 14px 80px' : '24px 28px' }}>
         {/* Tabs — mobile: scroll horizontal dengan ukuran lebih kecil */}
         <div style={{
           display: 'flex',
