@@ -316,8 +316,8 @@ export default function KasirPage() {
     whiteSpace: 'nowrap',
   });
 
-  // ✅ Tinggi konten: desktop 60px navbar, mobile 60px navbar + 48px tab bar
-  const contentHeight = isMobile ? 'calc(100vh - 162px)' : 'calc(100vh - 60px)';
+  // mobile: 52px topbar + 48px tab kasir (produk/keranjang) + 62px bottom nav global
+  const contentHeight = isMobile ? 'calc(100vh - 162px)' : 'calc(100vh - 56px)';
 
   return (
     <div style={{ minHeight:'100vh', background:C.bgPage, color:C.text }}>
@@ -359,11 +359,15 @@ export default function KasirPage() {
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : '1fr 380px',
         height: contentHeight,
+        // Mobile: grid row tunggal, isi penuh
+        gridTemplateRows: '1fr',
+        overflow: 'hidden',
       }}>
 
         {/* KIRI: Produk — disembunyikan di mobile saat tab keranjang aktif */}
         <div style={{
           padding: 20,
+          paddingBottom: isMobile ? 84 : 20,
           overflowY: 'auto',
           background: C.bgPage,
           display: isMobile && mobileTab === 'keranjang' ? 'none' : 'block',
@@ -478,6 +482,8 @@ export default function KasirPage() {
           flexDirection: 'column',
           borderLeft: isMobile ? 'none' : `1px solid #2d4a6e`,
           overflow: 'hidden',
+          // Mobile: pastikan tinggi pas dalam grid
+          minHeight: 0,
         }}>
           {/* Header keranjang */}
           <div style={{ padding:'16px 20px', borderBottom:'1px solid #2d4a6e', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -492,7 +498,13 @@ export default function KasirPage() {
           </div>
 
           {/* Items */}
-          <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '12px 16px',
+            // Pastikan tidak overflow keluar container
+            minHeight: 0,
+          }}>
             {keranjang.length === 0 ? (
               <div style={{ textAlign:'center', padding:'60px 20px', color:'#3d4f60' }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>🛒</div>
@@ -574,7 +586,14 @@ export default function KasirPage() {
 
           {/* Form bawah & total */}
           {keranjang.length > 0 && (
-            <div style={{ padding:'14px 16px', borderTop:'1px solid #2d4a6e' }}>
+            <div style={{
+              padding: '14px 16px',
+              paddingBottom: isMobile ? '24px' : '14px',
+              borderTop: '1px solid #2d4a6e',
+              // Mobile: bisa scroll jika konten melebihi layar
+              overflowY: isMobile ? 'auto' : 'visible',
+              flexShrink: 0,
+            }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
                 <div>
                   <label style={{ fontSize:11, color:'#7a8fa6', display:'block', marginBottom:4 }}>NAMA PEMBELI</label>
