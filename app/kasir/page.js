@@ -316,8 +316,9 @@ export default function KasirPage() {
     whiteSpace: 'nowrap',
   });
 
-  // mobile: 52px topbar + 48px tab kasir (produk/keranjang) + 62px bottom nav global
-  const contentHeight = isMobile ? 'calc(100vh - 162px)' : 'calc(100vh - 56px)';
+  // 52 topbar + 48 tab kasir + 62 bottom nav = 162px
+  // Desktop: 60px navbar saja
+  const contentHeight = isMobile ? 'calc(100vh - 162px)' : 'calc(100vh - 60px)';
 
   return (
     <div style={{ minHeight:'100vh', background:C.bgPage, color:C.text }}>
@@ -358,10 +359,11 @@ export default function KasirPage() {
       <div style={{
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : '1fr 380px',
-        height: contentHeight,
-        // Mobile: grid row tunggal, isi penuh
+        // Mobile: tinggi auto agar konten bisa scroll bebas
+        // Desktop: tinggi fixed agar layout split screen bekerja
+        height: isMobile ? 'auto' : contentHeight,
         gridTemplateRows: '1fr',
-        overflow: 'hidden',
+        overflow: isMobile ? 'visible' : 'hidden',
       }}>
 
         {/* KIRI: Produk — disembunyikan di mobile saat tab keranjang aktif */}
@@ -481,8 +483,9 @@ export default function KasirPage() {
           display: isMobile && mobileTab === 'produk' ? 'none' : 'flex',
           flexDirection: 'column',
           borderLeft: isMobile ? 'none' : `1px solid #2d4a6e`,
-          overflow: 'hidden',
-          // Mobile: pastikan tinggi pas dalam grid
+          // Desktop: overflow hidden agar flex bekerja dengan benar
+          // Mobile: overflow auto agar SELURUH panel bisa scroll
+          overflow: isMobile ? 'auto' : 'hidden',
           minHeight: 0,
         }}>
           {/* Header keranjang */}
@@ -499,10 +502,9 @@ export default function KasirPage() {
 
           {/* Items */}
           <div style={{
-            flex: 1,
-            overflowY: 'auto',
+            flex: isMobile ? 'none' : 1,
+            overflowY: isMobile ? 'visible' : 'auto',
             padding: '12px 16px',
-            // Pastikan tidak overflow keluar container
             minHeight: 0,
           }}>
             {keranjang.length === 0 ? (
@@ -588,10 +590,9 @@ export default function KasirPage() {
           {keranjang.length > 0 && (
             <div style={{
               padding: '14px 16px',
-              paddingBottom: isMobile ? '24px' : '14px',
+              // Padding bawah ekstra di mobile agar tombol tidak tertutup bottom nav
+              paddingBottom: isMobile ? '80px' : '14px',
               borderTop: '1px solid #2d4a6e',
-              // Mobile: bisa scroll jika konten melebihi layar
-              overflowY: isMobile ? 'auto' : 'visible',
               flexShrink: 0,
             }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>

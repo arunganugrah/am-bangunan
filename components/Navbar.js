@@ -322,8 +322,10 @@ export default function Navbar({ title, role, links = [] }) {
         })}
       </nav>
 
-      {/* Spacer — dorong konten agar tidak tertutup bottom bar */}
-      <div style={{ height: 62 }} />
+      {/* Spacer — hanya untuk halaman scroll normal, BUKAN kasir */}
+      {pathname !== '/kasir' && (
+        <div style={{ height: 62 }} />
+      )}
     </>
   );
 }
