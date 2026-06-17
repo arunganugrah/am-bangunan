@@ -181,164 +181,181 @@ export default function KasirPage() {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    /* ── Ukuran popup = ukuran kertas thermal (WYSIWYG) ── */
+    html {
+      width: 58mm;
+      background: #fff;
+    }
+
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;        /* naik dari 12px */
-      background: #fff;
+      font-size: 13px;
       color: #000;
-      width: 100%;            /* full width, tidak di-center */
-      padding: 4px 6px;       /* margin kiri kanan tipis saja */
+      background: #fff;
+      width: 58mm;
+      padding: 3mm 3mm;   /* simetris kiri kanan */
+      margin: 0;
     }
 
-    .struk {
-      width: 100%;            /* ikuti lebar kertas penuh */
-    }
+    .struk { width: 100%; }
 
-    .header { text-align: center; margin-bottom: 6px; }
-    .header .nama-toko { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; }
-    .header .info      { font-size: 11px; line-height: 1.7; }
-    .header .no-struk  { font-size: 11px; font-weight: 700; margin-top: 4px; }
+    /* Header */
+    .header        { text-align: center; margin-bottom: 5px; }
+    .nama-toko     { font-size: 15px; font-weight: 900; letter-spacing: 0.5px; }
+    .info-toko     { font-size: 10px; line-height: 1.6; }
+    .no-struk      { font-size: 10px; font-weight: 700; margin-top: 3px; }
 
-    .garis       { border-top: 1px dashed #000; margin: 5px 0; }
-    .garis-solid { border-top: 1px solid #000;  margin: 5px 0; }
+    /* Garis */
+    .garis         { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+    .garis-solid   { border: none; border-top: 1px solid #000;  margin: 4px 0; }
 
+    /* Baris info dua kolom */
     .info-row {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;        /* naik dari 10px */
-      line-height: 1.8;
+      font-size: 10px;
+      line-height: 1.7;
     }
 
-    .item-row    { margin-bottom: 5px; }
-    .item-nama   { font-size: 12px; font-weight: 700; word-break: break-word; }
-    .item-detail {
+    /* Alamat pembeli */
+    .alamat {
+      font-size: 10px;
+      line-height: 1.5;
+      word-break: break-word;
+      margin-bottom: 2px;
+    }
+
+    /* Item */
+    .item-row      { margin-bottom: 4px; }
+    .item-nama     { font-size: 12px; font-weight: 700; word-break: break-word; }
+    .item-detail   {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;        /* naik dari 10px */
-      padding-left: 3px;
+      font-size: 10px;
+      padding-left: 2px;
     }
-    .item-total  { font-weight: 700; white-space: nowrap; margin-left: 4px; }
+    .item-subtotal { font-weight: 700; white-space: nowrap; margin-left: 4px; }
 
-    .total-section  { margin-top: 2px; }
-    .total-baris    { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.9; }
-    .total-baris.diskon { color: #444; }
-    .total-baris.grand  { font-size: 15px; font-weight: 900; margin-top: 3px; }
-    .total-baris.kembalian { font-size: 12px; }
-
-    .footer {
-      text-align: center;
-      font-size: 12px;
-      margin-top: 8px;
+    /* Total */
+    .total-baris {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
       line-height: 1.8;
     }
+    .total-grand {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 900;
+      margin: 2px 0;
+    }
 
+    /* Footer */
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      margin-top: 6px;
+      line-height: 1.7;
+    }
+
+    /* Tombol — hilang saat print */
     .btn-cetak {
       display: block;
       width: 100%;
-      margin-top: 12px;
-      padding: 10px;
-      font-size: 13px;
+      margin-top: 10px;
+      padding: 9px;
+      font-size: 12px;
       cursor: pointer;
       background: #1a7f4b;
       color: #fff;
       border: none;
-      border-radius: 6px;
+      border-radius: 5px;
       font-family: sans-serif;
     }
 
+    /* ═══ PRINT ═══
+       @page margin 0 → tidak ada header/footer browser (Chrome/Edge)
+       body padding kecil → jarak minimal dari tepi kertas thermal
+       page-break setelah struk → tidak ada halaman kosong
+    */
     @media print {
       @page {
         size: 58mm auto;
-        margin: 0mm;          /* hapus semua margin browser */
+        margin: 0;
       }
-
-      /* Reset semua margin/padding saat print */
       html, body {
-        margin: 0 !important;
-        padding: 0 !important;
         width: 58mm !important;
+        margin: 0 !important;
+        padding: 2mm 3mm !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-
-      .struk {
-        width: 58mm !important;
-        padding: 2mm 3mm !important;   /* kiri kanan sama → tidak geser */
-        margin: 0 auto !important;     /* center di dalam page */
-      }
-
       .btn-cetak { display: none !important; }
+      /* Potong kertas tepat di akhir konten */
+      .struk {
+        page-break-after: always;
+        break-after: always;
+      }
     }
   </style>
 </head>
 <body>
   <div class="struk">
 
-    <!-- HEADER TOKO -->
     <div class="header">
       <div class="nama-toko">AM BANGUNAN</div>
-      <div class="info">
-        Jl. Andi Panggaru<br>
-        Sengkang<br>
-        No. Telp 082188871788
+      <div class="info-toko">
+        Jl. Andi Panggaru, Sengkang<br>
+        Telp. 082188871788
       </div>
       <div class="no-struk">${noStruk}</div>
     </div>
 
-    <div class="garis"></div>
+    <hr class="garis">
 
-    <!-- INFO TRANSAKSI: tanggal | kasir & jam | pembeli -->
     <div class="info-row">
-      <span class="kiri">${tglStr}</span>
-      <span class="kanan">Oleh: ${receipt.kasir?.split('@')[0] || '—'}</span>
+      <span>${tglStr}</span>
+      <span>Oleh: ${receipt.kasir?.split('@')[0] || '—'}</span>
     </div>
     <div class="info-row">
-      <span class="kiri">${jamStr}</span>
-      <span class="kanan">${receipt.namaPembeli !== 'Umum' ? receipt.namaPembeli : 'Umum'}</span>
+      <span>${jamStr}</span>
+      <span>${receipt.namaPembeli || 'Umum'}</span>
     </div>
-    ${receipt.alamatPembeli ? `
-    <div style="font-size:10px; margin-bottom:2px; word-break:break-word;">
-      ${receipt.alamatPembeli}
-    </div>` : ''}
+    ${receipt.alamatPembeli ? `<div class="alamat">${receipt.alamatPembeli}</div>` : ''}
 
-    <div class="garis"></div>
+    <hr class="garis">
 
-    <!-- ITEM-ITEM -->
     ${itemsHtml}
 
-    <div class="garis"></div>
+    <hr class="garis">
 
-    <!-- TOTAL -->
-    <div class="total-section">
-      ${receipt.diskon > 0 ? `
-      <div class="total-baris diskon">
-        <span>Diskon</span>
-        <span>- Rp ${Math.round(receipt.diskon).toLocaleString('id-ID')}</span>
-      </div>` : ''}
-      <div class="total-baris grand">
-        <span>TOTAL</span>
-        <span>Rp ${Math.round(receipt.total).toLocaleString('id-ID')}</span>
-      </div>
-      ${receipt.kembalian > 0 ? `
-      <div class="total-baris kembalian">
-        <span>Bayar</span>
-        <span>Rp ${Math.round(receipt.bayar).toLocaleString('id-ID')}</span>
-      </div>
-      <div class="total-baris kembalian">
-        <span>Kembalian</span>
-        <span>Rp ${Math.round(receipt.kembalian).toLocaleString('id-ID')}</span>
-      </div>` : ''}
+    ${receipt.diskon > 0 ? `
+    <div class="total-baris">
+      <span>Diskon</span>
+      <span>- Rp ${Math.round(receipt.diskon).toLocaleString('id-ID')}</span>
+    </div>` : ''}
+
+    <div class="total-grand">
+      <span>TOTAL</span>
+      <span>Rp ${Math.round(receipt.total).toLocaleString('id-ID')}</span>
     </div>
 
-    <div class="garis-solid"></div>
-
-    <!-- FOOTER -->
-    <div class="footer">
-      Terima kasih telah Berbelanja
+    ${receipt.kembalian > 0 ? `
+    <div class="total-baris">
+      <span>Bayar</span>
+      <span>Rp ${Math.round(receipt.bayar).toLocaleString('id-ID')}</span>
     </div>
+    <div class="total-baris">
+      <span>Kembalian</span>
+      <span>Rp ${Math.round(receipt.kembalian).toLocaleString('id-ID')}</span>
+    </div>` : ''}
 
-    <!-- Tombol cetak (hilang saat print) -->
-    <button class="btn-cetak" onclick="window.print(); setTimeout(()=>window.close(),500);">
+    <hr class="garis-solid">
+
+    <div class="footer">Terima kasih telah Berbelanja</div>
+
+    <button class="btn-cetak" onclick="window.print();setTimeout(()=>window.close(),800);">
       🖨️ Cetak Sekarang
     </button>
 
@@ -346,7 +363,8 @@ export default function KasirPage() {
 </body>
 </html>`;
 
-    const popup = window.open('', '_blank', 'width=420,height=650,scrollbars=yes');
+    // 58mm × 96dpi / 25.4 = ~219px lebar, pakai 240 untuk scrollbar
+    const popup = window.open('', '_blank', 'width=240,height=700,scrollbars=yes');
     if (!popup) {
       alert('Popup diblokir browser. Izinkan popup untuk situs ini di pengaturan browser, lalu coba lagi.');
       return;
