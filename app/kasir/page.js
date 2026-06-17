@@ -178,85 +178,59 @@ export default function KasirPage() {
   <meta name="viewport" content="width=device-width">
   <title>Struk AM Bangunan</title>
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 12px;
+      font-size: 13px;        /* naik dari 12px */
       background: #fff;
       color: #000;
-      /* Center konten di tengah halaman (untuk A4/Letter di iPhone) */
-      display: flex;
-      justify-content: center;
-      padding: 8px 0;
+      width: 100%;            /* full width, tidak di-center */
+      padding: 4px 4px;       /* margin kiri kanan tipis saja */
     }
 
-    /* Wrapper utama — lebar thermal 58mm */
     .struk {
-      width: 54mm;       /* sedikit di bawah 58mm untuk margin printer */
-      max-width: 54mm;
+      width: 100%;            /* ikuti lebar kertas penuh */
     }
 
-    /* Header toko */
     .header { text-align: center; margin-bottom: 6px; }
-    .header .nama-toko { font-size: 15px; font-weight: 900; letter-spacing: 0.5px; }
-    .header .info      { font-size: 10px; line-height: 1.6; }
-    .header .no-struk  { font-size: 10px; font-weight: 700; margin-top: 4px; }
+    .header .nama-toko { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; }
+    .header .info      { font-size: 11px; line-height: 1.7; }
+    .header .no-struk  { font-size: 11px; font-weight: 700; margin-top: 4px; }
 
-    /* Garis pemisah */
-    .garis { border-top: 1px dashed #000; margin: 5px 0; }
-    .garis-solid { border-top: 1px solid #000; margin: 5px 0; }
+    .garis       { border-top: 1px dashed #000; margin: 5px 0; }
+    .garis-solid { border-top: 1px solid #000;  margin: 5px 0; }
 
-    /* Baris info (tanggal/kasir, jam/pembeli) */
     .info-row {
       display: flex;
       justify-content: space-between;
-      font-size: 10px;
-      line-height: 1.7;
+      font-size: 11px;        /* naik dari 10px */
+      line-height: 1.8;
     }
-    .info-row .kiri { text-align: left; }
-    .info-row .kanan { text-align: right; }
 
-    /* Item produk */
-    .item-row { margin-bottom: 5px; }
-    .item-nama {
-      font-size: 11px;
-      font-weight: 700;
-      word-break: break-word;
-    }
+    .item-row    { margin-bottom: 5px; }
+    .item-nama   { font-size: 12px; font-weight: 700; word-break: break-word; }
     .item-detail {
       display: flex;
       justify-content: space-between;
-      font-size: 10px;
-      padding-left: 2mm;
+      font-size: 11px;        /* naik dari 10px */
+      padding-left: 3px;
     }
-    .item-total { font-weight: 700; white-space: nowrap; margin-left: 4px; }
+    .item-total  { font-weight: 700; white-space: nowrap; margin-left: 4px; }
 
-    /* Baris total & diskon */
-    .total-section { margin-top: 2px; }
-    .total-baris {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      line-height: 1.8;
-    }
-    .total-baris.diskon { color: #555; }
-    .total-baris.grand {
-      font-size: 14px;
-      font-weight: 900;
-      margin-top: 2px;
-    }
-    .total-baris.kembalian { font-size: 11px; }
+    .total-section  { margin-top: 2px; }
+    .total-baris    { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.9; }
+    .total-baris.diskon { color: #444; }
+    .total-baris.grand  { font-size: 15px; font-weight: 900; margin-top: 3px; }
+    .total-baris.kembalian { font-size: 12px; }
 
-    /* Footer */
     .footer {
       text-align: center;
-      font-size: 11px;
+      font-size: 12px;
       margin-top: 8px;
       line-height: 1.8;
     }
 
-    /* Tombol cetak — hilang saat print */
     .btn-cetak {
       display: block;
       width: 100%;
@@ -271,41 +245,13 @@ export default function KasirPage() {
       font-family: sans-serif;
     }
 
-    /* ═══════════════════════════
-       PRINT STYLES
-       Solusi iOS Safari (A4/Letter/dll):
-       - Tidak set ukuran kertas custom
-       - Konten di-center otomatis karena flexbox
-       - margin kecil agar tidak terpotong
-       ═══════════════════════════ */
     @media print {
       @page {
-        /* 'auto' = pakai ukuran yang dipilih user di dialog print */
-        /* Ini penting agar iOS Safari (A4/Letter) tetap bisa cetak */
-        size: auto;
-        margin: 6mm 8mm;
+        size: 58mm auto;      /* thermal 58mm, tinggi auto ikuti konten */
+        margin: 0;            /* tidak ada margin — printer thermal handle sendiri */
       }
-
-      body {
-        display: block;       /* reset flex saat print */
-        padding: 0;
-      }
-
-      .struk {
-        /* Center di halaman A4/Letter */
-        margin: 0 auto;
-        width: 54mm;
-        max-width: 54mm;
-      }
-
-      .btn-cetak { display: none !important; }
-
-      /* Potong kertas tepat setelah konten selesai */
-      .struk::after {
-        content: '';
-        display: block;
-        page-break-after: always;
-      }
+      body         { padding: 2px 3px; }  /* margin fisik minimal */
+      .btn-cetak   { display: none !important; }
     }
   </style>
 </head>
