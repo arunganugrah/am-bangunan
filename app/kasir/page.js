@@ -24,6 +24,7 @@ export default function KasirPage() {
   const [searchQ, setSearchQ]  = useState('');
   const [keranjang, setKeranjang] = useState([]);
   const [namaPembeli, setNamaPembeli] = useState('');
+  const [alamatPembeli, setAlamatPembeli] = useState('');
   const [catatan, setCatatan]  = useState('');
   const [diskon, setDiskon]    = useState('');
   const [bayar, setBayar]      = useState('');
@@ -247,11 +248,25 @@ export default function KasirPage() {
 
     @media print {
       @page {
-        size: 58mm auto;      /* thermal 58mm, tinggi auto ikuti konten */
-        margin: 0;            /* tidak ada margin — printer thermal handle sendiri */
+        size: 58mm auto;
+        margin: 0mm;          /* hapus semua margin browser */
       }
-      body         { padding: 2px 3px; }  /* margin fisik minimal */
-      .btn-cetak   { display: none !important; }
+
+      /* Reset semua margin/padding saat print */
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 58mm !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .struk {
+        width: 58mm !important;
+        padding: 2mm 2mm !important;   /* margin fisik tipis agar tidak terpotong tepi */
+      }
+
+      .btn-cetak { display: none !important; }
     }
   </style>
 </head>
@@ -280,6 +295,10 @@ export default function KasirPage() {
       <span class="kiri">${jamStr}</span>
       <span class="kanan">${receipt.namaPembeli !== 'Umum' ? receipt.namaPembeli : 'Umum'}</span>
     </div>
+    ${receipt.alamatPembeli ? `
+    <div style="font-size:10px; margin-bottom:2px; word-break:break-word;">
+      ${receipt.alamatPembeli}
+    </div>` : ''}
 
     <div class="garis"></div>
 
@@ -354,6 +373,7 @@ export default function KasirPage() {
       const data = {
         tanggal: serverTimestamp(),
         namaPembeli: namaPembeli || 'Umum',
+        alamatPembeli: alamatPembeli || '',
         catatan: catatan || '',
         items,
         subtotal: subtotalBruto,
@@ -384,6 +404,7 @@ export default function KasirPage() {
       setShowReceipt(receiptData);
       setKeranjang([]);
       setNamaPembeli('');
+      setAlamatPembeli('');
       setCatatan('');
       setDiskon('');
       setBayar('');
@@ -688,7 +709,7 @@ export default function KasirPage() {
               borderTop: '1px solid #2d4a6e',
               flexShrink: 0,
             }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:8 }}>
                 <div>
                   <label style={{ fontSize:11, color:'#7a8fa6', display:'block', marginBottom:4 }}>NAMA PEMBELI</label>
                   <input style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid #2d4a6e',
@@ -701,6 +722,17 @@ export default function KasirPage() {
                     background:'#0f1c2b', color:'#e8edf2', fontSize:13 }}
                     placeholder="mis. 10000 atau 5%" value={diskon} onChange={e => setDiskon(e.target.value)} />
                 </div>
+              </div>
+
+              {/* Alamat pembeli — optional, full width */}
+              <div style={{ marginBottom:12 }}>
+                <label style={{ fontSize:11, color:'#7a8fa6', display:'block', marginBottom:4 }}>
+                  ALAMAT PEMBELI <span style={{ color:'#3d4f60', fontWeight:400 }}>(opsional)</span>
+                </label>
+                <input style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid #2d4a6e',
+                  background:'#0f1c2b', color:'#e8edf2', fontSize:13 }}
+                  placeholder="mis. Jl. Merdeka No. 5, Sengkang..."
+                  value={alamatPembeli} onChange={e => setAlamatPembeli(e.target.value)} />
               </div>
 
               <div style={{ background:'#0f1c2b', borderRadius:10, padding:'12px 14px', marginBottom:12, fontSize:13 }}>
