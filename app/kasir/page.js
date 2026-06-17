@@ -180,123 +180,73 @@ export default function KasirPage() {
   <title>Struk AM Bangunan</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    /* ── Ukuran popup = ukuran kertas thermal (WYSIWYG) ── */
-    html {
-      width: 58mm;
-      background: #fff;
-    }
-
     body {
       font-family: 'Courier New', Courier, monospace;
       font-size: 13px;
-      color: #000;
       background: #fff;
-      width: 58mm;
-      padding: 3mm 3mm;   /* simetris kiri kanan */
-      margin: 0;
+      color: #000;
+      width: 100%;
+      padding: 4px 4px;
     }
-
     .struk { width: 100%; }
-
-    /* Header */
-    .header        { text-align: center; margin-bottom: 5px; }
-    .nama-toko     { font-size: 15px; font-weight: 900; letter-spacing: 0.5px; }
-    .info-toko     { font-size: 10px; line-height: 1.6; }
-    .no-struk      { font-size: 10px; font-weight: 700; margin-top: 3px; }
-
-    /* Garis */
-    .garis         { border: none; border-top: 1px dashed #000; margin: 4px 0; }
-    .garis-solid   { border: none; border-top: 1px solid #000;  margin: 4px 0; }
-
-    /* Baris info dua kolom */
+    .header { text-align: center; margin-bottom: 6px; }
+    .header .nama-toko { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; }
+    .header .info      { font-size: 11px; line-height: 1.7; }
+    .header .no-struk  { font-size: 11px; font-weight: 700; margin-top: 4px; }
+    .garis       { border-top: 1px dashed #000; margin: 5px 0; }
+    .garis-solid { border-top: 1px solid #000;  margin: 5px 0; }
     .info-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 10px;
-      line-height: 1.7;
-    }
-
-    /* Alamat pembeli */
-    .alamat {
-      font-size: 10px;
-      line-height: 1.5;
-      word-break: break-word;
-      margin-bottom: 2px;
-    }
-
-    /* Item */
-    .item-row      { margin-bottom: 4px; }
-    .item-nama     { font-size: 12px; font-weight: 700; word-break: break-word; }
-    .item-detail   {
-      display: flex;
-      justify-content: space-between;
-      font-size: 10px;
-      padding-left: 2px;
-    }
-    .item-subtotal { font-weight: 700; white-space: nowrap; margin-left: 4px; }
-
-    /* Total */
-    .total-baris {
       display: flex;
       justify-content: space-between;
       font-size: 11px;
       line-height: 1.8;
     }
-    .total-grand {
+    .alamat {
+      font-size: 11px;
+      line-height: 1.5;
+      word-break: break-word;
+      margin-bottom: 2px;
+    }
+    .item-row    { margin-bottom: 5px; }
+    .item-nama   { font-size: 12px; font-weight: 700; word-break: break-word; }
+    .item-detail {
       display: flex;
       justify-content: space-between;
-      font-size: 14px;
-      font-weight: 900;
-      margin: 2px 0;
+      font-size: 11px;
+      padding-left: 3px;
     }
-
-    /* Footer */
+    .item-total  { font-weight: 700; white-space: nowrap; margin-left: 4px; }
+    .total-section  { margin-top: 2px; }
+    .total-baris    { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.9; }
+    .total-baris.diskon { color: #444; }
+    .total-baris.grand  { font-size: 15px; font-weight: 900; margin-top: 3px; }
+    .total-baris.kembalian { font-size: 12px; }
     .footer {
       text-align: center;
-      font-size: 11px;
-      margin-top: 6px;
-      line-height: 1.7;
+      font-size: 12px;
+      margin-top: 8px;
+      line-height: 1.8;
     }
-
-    /* Tombol — hilang saat print */
     .btn-cetak {
       display: block;
       width: 100%;
-      margin-top: 10px;
-      padding: 9px;
-      font-size: 12px;
+      margin-top: 12px;
+      padding: 10px;
+      font-size: 13px;
       cursor: pointer;
       background: #1a7f4b;
       color: #fff;
       border: none;
-      border-radius: 5px;
+      border-radius: 6px;
       font-family: sans-serif;
     }
-
-    /* ═══ PRINT ═══
-       @page margin 0 → tidak ada header/footer browser (Chrome/Edge)
-       body padding kecil → jarak minimal dari tepi kertas thermal
-       page-break setelah struk → tidak ada halaman kosong
-    */
     @media print {
       @page {
         size: 58mm auto;
         margin: 0;
       }
-      html, body {
-        width: 58mm !important;
-        margin: 0 !important;
-        padding: 2mm 3mm !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .btn-cetak { display: none !important; }
-      /* Potong kertas tepat di akhir konten */
-      .struk {
-        page-break-after: always;
-        break-after: always;
-      }
+      body         { padding: 2px 3px; }
+      .btn-cetak   { display: none !important; }
     }
   </style>
 </head>
@@ -364,13 +314,16 @@ export default function KasirPage() {
 </html>`;
 
     // 58mm × 96dpi / 25.4 = ~219px lebar, pakai 240 untuk scrollbar
-    const popup = window.open('', '_blank', 'width=240,height=700,scrollbars=yes');
+    const popup = window.open('', '_blank', 'width=240,height=700,scrollbars=yes,resizable=yes');
     if (!popup) {
-      alert('Popup diblokir browser. Izinkan popup untuk situs ini di pengaturan browser, lalu coba lagi.');
+      alert('Popup diblokir browser.\n\nDi Safari iPhone: Pengaturan → Safari → Izinkan Pop-up.\nDi Chrome: klik ikon kunci di address bar → Pop-up → Izinkan.');
       return;
     }
+    popup.document.open();
     popup.document.write(html);
     popup.document.close();
+    // Safari butuh sedikit waktu sebelum konten siap
+    popup.onload = () => popup.focus();
   }; 
   const simpanTransaksi = async () => {
     if (keranjang.length === 0) return;
