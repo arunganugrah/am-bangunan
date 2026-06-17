@@ -153,87 +153,234 @@ export default function KasirPage() {
   const kembalian     = bayar ? parseInt(bayar) - totalBayar : null;
 
  const cetakStruk = (receipt) => {
-    const tanggal = new Date(receipt.tanggal.seconds * 1000).toLocaleString('id-ID');
+    const tanggal = new Date(receipt.tanggal.seconds * 1000);
+    const tglStr  = tanggal.toLocaleDateString('id-ID', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const jamStr  = tanggal.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+
+    // Generate nomor struk random 8 digit
+    const noStruk = 'INV-' + Math.random().toString(36).substring(2,6).toUpperCase() +
+                    '-' + String(Math.floor(Math.random()*9000)+1000);
+
     const itemsHtml = receipt.items.map(item => `
-      <tr>
-        <td style="padding:4px 0">${item.nama}</td>
-        <td style="text-align:center;padding:4px 8px">${item.qty} ${item.satuan}</td>
-        <td style="text-align:right;padding:4px 0">Rp ${Math.round(item.harga_jual).toLocaleString('id-ID')}</td>
-        <td style="text-align:right;padding:4px 0;font-weight:bold">Rp ${Math.round(item.subtotal).toLocaleString('id-ID')}</td>
-      </tr>
+      <div class="item-row">
+        <div class="item-nama">${item.nama}</div>
+        <div class="item-detail">
+          <span>${item.qty} ${item.satuan} &times; Rp ${Math.round(item.harga_jual).toLocaleString('id-ID')}</span>
+          <span class="item-total">Rp ${Math.round(item.subtotal).toLocaleString('id-ID')}</span>
+        </div>
+      </div>
     `).join('');
 
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width">
   <title>Struk AM Bangunan</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: monospace; font-size: 11px; width: 58mm; margin: 0; padding: 4mm 2mm; }
-    .toko { text-align:center; margin-bottom:12px; }
-    .toko h2 { font-size:13px; font-weight:900; letter-spacing:0.5px; }
-    .toko p { font-size:9px; color:#555; margin-top:1px; }
-    .garis { border-top:1px dashed #000; margin:8px 0; }
-    table { width:100%; border-collapse:collapse; }
-    th { font-size:9px; text-align:left; padding:3px 0; border-bottom:1px solid #ccc; }
-    td { font-size:10px; }
-    .total-row { font-size:12px; font-weight:bold; }
-    .footer { text-align:center; font-size:11px; color:#555; margin-top:12px; }
+
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      background: #fff;
+      color: #000;
+      /* Center konten di tengah halaman (untuk A4/Letter di iPhone) */
+      display: flex;
+      justify-content: center;
+      padding: 8px 0;
+    }
+
+    /* Wrapper utama — lebar thermal 58mm */
+    .struk {
+      width: 54mm;       /* sedikit di bawah 58mm untuk margin printer */
+      max-width: 54mm;
+    }
+
+    /* Header toko */
+    .header { text-align: center; margin-bottom: 6px; }
+    .header .nama-toko { font-size: 15px; font-weight: 900; letter-spacing: 0.5px; }
+    .header .info      { font-size: 10px; line-height: 1.6; }
+    .header .no-struk  { font-size: 10px; font-weight: 700; margin-top: 4px; }
+
+    /* Garis pemisah */
+    .garis { border-top: 1px dashed #000; margin: 5px 0; }
+    .garis-solid { border-top: 1px solid #000; margin: 5px 0; }
+
+    /* Baris info (tanggal/kasir, jam/pembeli) */
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      line-height: 1.7;
+    }
+    .info-row .kiri { text-align: left; }
+    .info-row .kanan { text-align: right; }
+
+    /* Item produk */
+    .item-row { margin-bottom: 5px; }
+    .item-nama {
+      font-size: 11px;
+      font-weight: 700;
+      word-break: break-word;
+    }
+    .item-detail {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      padding-left: 2mm;
+    }
+    .item-total { font-weight: 700; white-space: nowrap; margin-left: 4px; }
+
+    /* Baris total & diskon */
+    .total-section { margin-top: 2px; }
+    .total-baris {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      line-height: 1.8;
+    }
+    .total-baris.diskon { color: #555; }
+    .total-baris.grand {
+      font-size: 14px;
+      font-weight: 900;
+      margin-top: 2px;
+    }
+    .total-baris.kembalian { font-size: 11px; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      margin-top: 8px;
+      line-height: 1.8;
+    }
+
+    /* Tombol cetak — hilang saat print */
+    .btn-cetak {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      font-size: 13px;
+      cursor: pointer;
+      background: #1a7f4b;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-family: sans-serif;
+    }
+
+    /* ═══════════════════════════
+       PRINT STYLES
+       Solusi iOS Safari (A4/Letter/dll):
+       - Tidak set ukuran kertas custom
+       - Konten di-center otomatis karena flexbox
+       - margin kecil agar tidak terpotong
+       ═══════════════════════════ */
     @media print {
-      @page { margin: 0; size: 58mm auto; }
-      body { width: 58mm; padding: 2mm; }
-      button { display:none !important; }
+      @page {
+        /* 'auto' = pakai ukuran yang dipilih user di dialog print */
+        /* Ini penting agar iOS Safari (A4/Letter) tetap bisa cetak */
+        size: auto;
+        margin: 6mm 8mm;
+      }
+
+      body {
+        display: block;       /* reset flex saat print */
+        padding: 0;
+      }
+
+      .struk {
+        /* Center di halaman A4/Letter */
+        margin: 0 auto;
+        width: 54mm;
+        max-width: 54mm;
+      }
+
+      .btn-cetak { display: none !important; }
+
+      /* Potong kertas tepat setelah konten selesai */
+      .struk::after {
+        content: '';
+        display: block;
+        page-break-after: always;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="toko">
-    <h2>AM BANGUNAN</h2>
-    <p>Struk Pembelian</p>
-    <p>${tanggal}</p>
-    ${receipt.namaPembeli && receipt.namaPembeli !== 'Umum' ? `<p>Pembeli: ${receipt.namaPembeli}</p>` : ''}
-  </div>
-  <div class="garis"></div>
-  <table>
-    <thead><tr>
-      <th>Item</th>
-      <th style="text-align:center">Qty</th>
-      <th style="text-align:right">Harga</th>
-      <th style="text-align:right">Subtotal</th>
-    </tr></thead>
-    <tbody>${itemsHtml}</tbody>
-  </table>
-  <div class="garis"></div>
-  ${receipt.diskon > 0 ? `
-  <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-    <span>Diskon</span>
-    <span>- Rp ${Math.round(receipt.diskon).toLocaleString('id-ID')}</span>
-  </div>` : ''}
-  <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:bold;margin-bottom:4px">
-    <span>TOTAL</span>
-    <span>Rp ${Math.round(receipt.total).toLocaleString('id-ID')}</span>
-  </div>
-  ${receipt.kembalian > 0 ? `
-  <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-    <span>Bayar</span><span>Rp ${Math.round(receipt.bayar).toLocaleString('id-ID')}</span>
-  </div>
-  <div style="display:flex;justify-content:space-between">
-    <span>Kembalian</span><span>Rp ${Math.round(receipt.kembalian).toLocaleString('id-ID')}</span>
-  </div>` : ''}
-  <div class="garis"></div>
-  <div class="footer">Terima kasih atas kunjungan Anda!</div>
-  <br>
-  <div style="text-align:center">
-    <button onclick="window.print();window.close();"
-      style="padding:8px 24px;font-size:13px;cursor:pointer;background:#1a7f4b;color:#fff;border:none;border-radius:6px">
+  <div class="struk">
+
+    <!-- HEADER TOKO -->
+    <div class="header">
+      <div class="nama-toko">AM BANGUNAN</div>
+      <div class="info">
+        Jl. Andi Panggaru<br>
+        Sengkang<br>
+        No. Telp 082188871788
+      </div>
+      <div class="no-struk">${noStruk}</div>
+    </div>
+
+    <div class="garis"></div>
+
+    <!-- INFO TRANSAKSI: tanggal | kasir & jam | pembeli -->
+    <div class="info-row">
+      <span class="kiri">${tglStr}</span>
+      <span class="kanan">Oleh: ${receipt.kasir?.split('@')[0] || '—'}</span>
+    </div>
+    <div class="info-row">
+      <span class="kiri">${jamStr}</span>
+      <span class="kanan">${receipt.namaPembeli !== 'Umum' ? receipt.namaPembeli : 'Umum'}</span>
+    </div>
+
+    <div class="garis"></div>
+
+    <!-- ITEM-ITEM -->
+    ${itemsHtml}
+
+    <div class="garis"></div>
+
+    <!-- TOTAL -->
+    <div class="total-section">
+      ${receipt.diskon > 0 ? `
+      <div class="total-baris diskon">
+        <span>Diskon</span>
+        <span>- Rp ${Math.round(receipt.diskon).toLocaleString('id-ID')}</span>
+      </div>` : ''}
+      <div class="total-baris grand">
+        <span>TOTAL</span>
+        <span>Rp ${Math.round(receipt.total).toLocaleString('id-ID')}</span>
+      </div>
+      ${receipt.kembalian > 0 ? `
+      <div class="total-baris kembalian">
+        <span>Bayar</span>
+        <span>Rp ${Math.round(receipt.bayar).toLocaleString('id-ID')}</span>
+      </div>
+      <div class="total-baris kembalian">
+        <span>Kembalian</span>
+        <span>Rp ${Math.round(receipt.kembalian).toLocaleString('id-ID')}</span>
+      </div>` : ''}
+    </div>
+
+    <div class="garis-solid"></div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      Terima kasih telah Berbelanja
+    </div>
+
+    <!-- Tombol cetak (hilang saat print) -->
+    <button class="btn-cetak" onclick="window.print(); setTimeout(()=>window.close(),500);">
       🖨️ Cetak Sekarang
     </button>
+
   </div>
 </body>
 </html>`;
 
-    const popup = window.open('', '_blank', 'width=380,height=600,scrollbars=yes');
+    const popup = window.open('', '_blank', 'width=420,height=650,scrollbars=yes');
     if (!popup) {
       alert('Popup diblokir browser. Izinkan popup untuk situs ini di pengaturan browser, lalu coba lagi.');
       return;
