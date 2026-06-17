@@ -187,7 +187,7 @@ export default function KasirPage() {
       background: #fff;
       color: #000;
       width: 100%;            /* full width, tidak di-center */
-      padding: 4px 4px;       /* margin kiri kanan tipis saja */
+      padding: 4px 6px;       /* margin kiri kanan tipis saja */
     }
 
     .struk {
@@ -263,7 +263,8 @@ export default function KasirPage() {
 
       .struk {
         width: 58mm !important;
-        padding: 2mm 2mm !important;   /* margin fisik tipis agar tidak terpotong tepi */
+        padding: 2mm 3mm !important;   /* kiri kanan sama → tidak geser */
+        margin: 0 auto !important;     /* center di dalam page */
       }
 
       .btn-cetak { display: none !important; }
